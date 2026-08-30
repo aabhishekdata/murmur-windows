@@ -1,10 +1,75 @@
-# Murmur YouTube
+# Murmur
 
-Push-to-talk dictation for macOS. Hold a key, talk, release — cleaned-up text lands in
-whatever text field has focus. A Wispr Flow-shaped app, built native and fully on-device.
+Push-to-talk dictation that runs entirely on your own machine. Hold a key, talk, release —
+cleaned-up text lands in whatever text field has focus. No cloud, no account, no audio
+leaving the device.
 
-**Status:** working skeleton. Builds, launches, arms the hotkey, transcribes, injects.
-Branding and the LLM cleanup tier are the next passes.
+This repository holds two implementations:
+
+| | Status |
+|---|---|
+| **[`windows/`](windows/) — the Windows app** | Actively developed. Runs on real hardware; 356 tests green. **Start here.** |
+| `Sources/`, `Tests/` — the macOS app | Upstream code, unchanged. See [The macOS app](#the-macos-app) below. |
+
+---
+
+## Credit
+
+The original project — the macOS app, the architecture, and the dictionary contract that
+both platforms implement — is **[per-simmons/murmur-youtube](https://github.com/per-simmons/murmur-youtube)**.
+This repository is a derivative work: the Windows port in `windows/` was built on top of it.
+All macOS code and the shared design remain the original author's.
+
+---
+
+## Quick start (Windows)
+
+You need nothing installed to *run* it — the published executable is self-contained.
+
+1. Grab `Murmur-win-x64.zip` from the [Releases](../../releases) page and unzip it to a
+   folder you can write to (not `C:\Program Files`).
+2. Run `get-model.ps1` once to download the Parakeet speech model (~661 MB). Windows has no
+   built-in speech engine this app can use, so it cannot transcribe until the model is on disk.
+3. Run `Murmur.App.exe`. SmartScreen will warn that it's unsigned — *More info* → *Run anyway*.
+4. Hold **Right Ctrl**, speak, release.
+
+`windows/artifacts/publish/README-FIRST.md` ships alongside the binary with the same steps.
+
+## Building it yourself (Windows)
+
+```bash
+cd windows
+dotnet build Murmur.sln -c Release          # needs the .NET SDK in global.json
+dotnet test  Murmur.sln -c Release          # 356 tests
+dotnet publish src/Murmur.App/Murmur.App.csproj \
+  -c Release -r win-x64 --self-contained true \
+  -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
+  -o artifacts/publish
+```
+
+Building **on** Windows is the supported path — the MSBuild targets that copy
+`Murmur.Platform.Windows.dll` and the NAudio libraries beside the executable are gated on
+`IsWindows()`. Cross-compiling from macOS or Linux works for everything else if you add
+`-p:EnableWindowsTargeting=true`, but you must then publish `Murmur.Platform.Windows`
+separately and copy its output beside the exe yourself; without those files the app starts
+and immediately fails to open a microphone.
+
+The full architecture, the platform decisions, and an honest account of what is and isn't
+verified are in **[`windows/README.md`](windows/README.md)**.
+
+## Building the macOS app
+
+```bash
+make install     # builds, bundles, signs, copies to /Applications, launches
+```
+
+Details, permissions and the TCC notes are below.
+
+---
+
+# <a id="the-macos-app"></a>The macOS app
+
+*Everything from here down is the original project's documentation, preserved as-is.*
 
 ---
 

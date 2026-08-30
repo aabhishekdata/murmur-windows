@@ -1,0 +1,141 @@
+name: Release
+
+# Cuts a downloadable Windows build. The Windows workflow proves every push compiles and
+# passes its tests; this one exists so a person who does not have the .NET SDK — or any
+# interest in installing it — can get a working app from the Releases page.
+#
+# Trigger by pushing a tag:  git tag v1.0.0 && git push origin v1.0.0
+# Or run it by hand from the Actions tab, which produces a draft release you can edit
+# before anyone sees it.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g. v1.0.0)'
+        required: true
+
+# The default token is read-only under this repository's settings; creating a release
+# needs write access to contents, and nothing else.
+permissions:
+  contents: write
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: windows
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: windows/global.json
+
+      - name: Resolve version
+        id: version
+        shell: pwsh
+        run: |
+          $v = if ('${{ github.event_name }}' -eq 'workflow_dispatch') {
+            '${{ github.event.inputs.version }}'
+          } else {
+            '${{ github.ref_name }}'
+          }
+          if ($v -notmatch '^v\d+\.\d+\.\d+') { throw "Version '$v' is not vMAJOR.MINOR.PATCH" }
+          Write-Host "version: $v"
+          "value=$v" >> $env:GITHUB_OUTPUT
+
+      - name: Restore
+        run: dotnet restore Murmur.sln
+
+      # A release that ships code the tests never saw is worse than no release. Same
+      # --no-incremental reasoning as the Windows workflow: analyzer warnings are not
+      # re-emitted on a cached build, so -warnaserror would be theatre without it.
+      - name: Build (warnings are errors)
+        run: >
+          dotnet build Murmur.sln
+          --no-restore --configuration Release --no-incremental -warnaserror
+
+      - name: Test
+        run: dotnet test Murmur.sln --no-build --configuration Release
+
+      - name: Publish
+        run: >
+          dotnet publish src/Murmur.App/Murmur.App.csproj
+          --configuration Release --runtime win-x64 --self-contained true
+          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+          --output artifacts/publish
+
+      # The platform layer and the NAudio libraries sit loose beside the exe rather than
+      # inside the bundle — PublishSingleFile only bundles assemblies the compiler knows
+      # about, and Murmur.Platform.Windows is deliberately invisible to it. An archive
+      # missing them produces an app that starts and then cannot open a microphone, which
+      # is a miserable thing to hand someone, so the layout is asserted here.
+      - name: Verify the payload is complete
+        shell: pwsh
+        run: |
+          $dir = 'artifacts/publish'
+          # Setup notes and the model downloader are source files under packaging/, not
+          # build output — a release that omits them ships an app that cannot transcribe
+          # and does not say why.
+          Copy-Item 'packaging/README-FIRST.md', 'packaging/get-model.ps1' $dir -Force
+          $required = @('Murmur.App.exe', 'Murmur.Platform.Windows.dll', 'NAudio.dll',
+                        'NAudio.Core.dll', 'NAudio.Wasapi.dll', 'NAudio.WinMM.dll',
+                        'NAudio.Asio.dll', 'NAudio.Midi.dll', 'NAudio.WinForms.dll',
+                        'README-FIRST.md', 'get-model.ps1')
+          $missing = $required | Where-Object { -not (Test-Path (Join-Path $dir $_)) }
+          if ($missing) { throw "Publish output is missing: $($missing -join ', ')" }
+          Get-ChildItem $dir -Include *.pdb, *.xml -Recurse | Remove-Item -Force
+          Get-ChildItem $dir | Select-Object Name, @{n='MB';e={[math]::Round($_.Length/1MB,2)}}
+
+      # The exe cannot show a window on a runner, so --selftest is how a release proves the
+      # binary it is about to publish actually starts: bundle extraction, native library
+      # resolution and platform-layer construction all happen before it exits.
+      - name: Smoke-test the published exe
+        shell: pwsh
+        run: |
+          $run = Start-Process -FilePath 'artifacts/publish/Murmur.App.exe' `
+                               -ArgumentList '--selftest' -Wait -PassThru -NoNewWindow
+          if ($run.ExitCode -ne 0) { throw "self-test failed with exit code $($run.ExitCode)" }
+
+      - name: Package
+        shell: pwsh
+        run: |
+          Compress-Archive -Path 'artifacts/publish/*' `
+                           -DestinationPath 'artifacts/Murmur-win-x64.zip' -Force
+          $mb = [math]::Round((Get-Item 'artifacts/Murmur-win-x64.zip').Length / 1MB, 1)
+          Write-Host "archive: $mb MB"
+
+      - name: Create the release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.value }}
+          name: Murmur ${{ steps.version.outputs.value }}
+          draft: ${{ github.event_name == 'workflow_dispatch' }}
+          files: windows/artifacts/Murmur-win-x64.zip
+          body: |
+            Self-contained Windows build — no .NET install required.
+
+            **Setup**
+            1. Unzip everything to one folder you can write to (not `C:\Program Files`) —
+               keep `Murmur.App.exe` and the DLLs together.
+            2. Run `get-model.ps1` once to download the Parakeet speech model (~661 MB).
+               Windows has no built-in engine this app can use, so it cannot transcribe
+               until the model is on disk.
+            3. Run `Murmur.App.exe`. SmartScreen warns because the build is unsigned —
+               *More info* → *Run anyway*.
+            4. Hold **Right Ctrl**, speak, release.
+
+            Transcription is fully offline. Nothing is uploaded, and there is no account.

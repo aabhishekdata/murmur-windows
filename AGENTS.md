@@ -20,11 +20,12 @@ whatever had focus. Two independent implementations:
 
 **The macOS app works and is in daily use.**
 
-**The Windows app is complete but has never run on real hardware.** Every layer exists;
-CI builds it, runs 63 tests, publishes a single-file executable, launches it on Windows and
-confirms the platform layer loads and constructs. What has never happened is a person
-holding the key and speaking into a microphone. Describe it that way — not as "working",
-not as "unfinished".
+**The Windows app works on real hardware.** A person has held the key, spoken, and watched
+the text land in another application. CI builds it, runs 356 tests, publishes a single-file
+executable, launches it on Windows and confirms the platform layer loads and constructs.
+Individual bindings that CI cannot reach — device enumeration against real hardware, the
+Enter keystroke reaching a foreground app — are still fake-only; say so specifically rather
+than hedging the whole app.
 
 ---
 
