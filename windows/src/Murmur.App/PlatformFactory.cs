@@ -32,15 +32,27 @@ internal static class PlatformFactory
     public static bool IsAvailable => Load() is not null;
 
     /// <summary>
-    /// Teaches the default load context to find the platform assembly beside the executable.
+    /// Teaches the default load context to find the platform assembly — and anything it in
+    /// turn depends on — beside the executable.
     /// </summary>
     /// <remarks>
-    /// <c>PublishSingleFile</c> only bundles assemblies the compiler knows about, and this
-    /// one is deliberately invisible to it — that is what keeps <c>Murmur.App</c> on plain
-    /// <c>net10.0</c>. It therefore ships as a loose file next to the exe. Default probing
-    /// normally finds it, but a single-file host resolves differently enough that relying on
-    /// that alone is a bet — and losing it means the app starts fine and then does nothing
-    /// when the user presses the key. Explicit is cheaper than that failure.
+    /// <para>
+    /// <c>PublishSingleFile</c> only bundles assemblies the compiler knows about, and the
+    /// platform layer is deliberately invisible to it — that is what keeps <c>Murmur.App</c>
+    /// on plain <c>net10.0</c>. It therefore ships as loose files next to the exe: the
+    /// platform assembly itself plus its own references (the NAudio family). A single-file
+    /// host resolves none of them from disk on its own, and losing one means the app starts
+    /// fine and then does nothing when the user presses the key. Explicit is cheaper than
+    /// that failure.
+    /// </para>
+    /// <para>
+    /// The resolver is therefore general: any assembly the runtime fails to find is looked
+    /// up as <c>&lt;name&gt;.dll</c> in <see cref="AppContext.BaseDirectory"/> — and only
+    /// there — and loaded if present. Hardcoding just <c>Murmur.Platform.Windows</c> here
+    /// was a real shipped bug: the platform DLL loaded (so the hotkey hook worked), but the
+    /// first touch of a NAudio.Wasapi type threw <c>FileNotFoundException</c> and capture
+    /// silently produced nothing.
+    /// </para>
     /// </remarks>
     [UnconditionalSuppressMessage(
         "Trimming",
@@ -54,9 +66,9 @@ internal static class PlatformFactory
 
         AssemblyLoadContext.Default.Resolving += (context, name) =>
         {
-            if (!string.Equals(name.Name, AssemblyName, StringComparison.Ordinal)) return null;
+            if (name.Name is null) return null;
 
-            var candidate = System.IO.Path.Combine(AppContext.BaseDirectory, AssemblyName + ".dll");
+            var candidate = System.IO.Path.Combine(AppContext.BaseDirectory, name.Name + ".dll");
             return File.Exists(candidate) ? context.LoadFromAssemblyPath(candidate) : null;
         };
     }
@@ -64,8 +76,17 @@ internal static class PlatformFactory
     private static bool _resolverInstalled;
 
     /// <summary>Creates the WASAPI capture, or null off Windows.</summary>
-    public static IAudioCapture? CreateAudioCapture() =>
-        Create<IAudioCapture>("WasapiAudioCapture", [null]);
+    /// <param name="deviceId">
+    /// Reads the chosen microphone's ID, or null for the system default. Called at the start of
+    /// every recording rather than once, so changing the microphone takes effect on the next
+    /// dictation instead of at the next restart.
+    /// </param>
+    public static IAudioCapture? CreateAudioCapture(Func<string?> deviceId) =>
+        Create<IAudioCapture>("WasapiAudioCapture", [deviceId]);
+
+    /// <summary>Creates the WASAPI device list, or null off Windows.</summary>
+    public static IAudioDeviceCatalog? CreateAudioDeviceCatalog() =>
+        Create<IAudioDeviceCatalog>("WasapiDeviceCatalog", []);
 
     /// <summary>Creates the low-level keyboard hook, or null off Windows.</summary>
     [UnconditionalSuppressMessage(

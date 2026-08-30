@@ -2,10 +2,11 @@
 
 The Windows port of Murmur — push-to-talk dictation, on-device.
 
-> **Status: feature-complete, never run on real hardware.** Every layer exists and CI
-> builds, tests and publishes a working single-file executable that starts and passes its
-> own self-test on Windows. What has *not* happened is a human holding the key and speaking
-> into a real microphone — see [Honesty](#honesty).
+> **Status: working on real hardware.** A person has held the key, spoken, and watched the
+> text land in another application. CI builds, tests and publishes a self-contained
+> executable that passes its own self-test on Windows; 356 tests are green. What is still
+> exercised only through fakes — real device enumeration, the Enter keystroke reaching a
+> foreground app — is listed under [Honesty](#honesty).
 
 ---
 
@@ -69,6 +70,58 @@ install a toolkit. On CPU with int8 weights, transcription runs ~40× faster tha
 
 ---
 
+## The interface
+
+Two windows and a tray icon.
+
+**The floating bar** is the primary surface: a small dark pill, frameless, always on top,
+never activated, kept out of the taskbar. It shows four states — at rest, listening (white
+level bars that move with the voice), transcribing (pulsing dots), and "no model". Click it to
+start and stop; drag it and it settles onto the nearest edge, turning vertical on a side; its
+placement is stored as an edge plus a fraction (never pixels — a saved pixel position is
+off-screen the moment a monitor is unplugged, and a frameless taskbar-less window that lands
+off-screen cannot be recovered). Right-click for the menu.
+
+**The hub** is the management window: a sidebar over Home (stats and searchable transcript
+history, grouped by day), Dictionary and Settings.
+
+`ShowActivated = false` on the bar is not cosmetic. Murmur types into whatever has focus, so a
+bar that takes focus redirects the user's own dictation into itself.
+
+Rendered previews of every screen and state live in `artifacts/ui-preview/`.
+
+---
+
+## The text pipeline
+
+Six passes rewrite the transcript between the recogniser and the keyboard, and the order they
+run in changes the answer. It is fixed in one place — `TextPipeline` — rather than emerging from
+the order somebody added them to the engine:
+
+```
+filler removal → dictionary → self-correction → command extraction → snippets → list formatting
+```
+
+Each position is load-bearing, and `TextPipelineOrderTests` pins every one of them:
+
+| Step | Why here |
+|---|---|
+| Filler removal | First, so "cloud um code" reaches the dictionary as "cloud code" |
+| Dictionary | Before anything that reasons about words, so it reasons about the right ones |
+| Self-correction | After the dictionary (the marker itself can be misheard), before snippets |
+| Command extraction | **Before** expansion, so a snippet body ending "press enter" can never submit |
+| Snippets | Trigger is now spelled right, has survived retraction, cannot reach the command |
+| List formatting | Last — the only pass that inserts newlines; everything else matches flat text |
+
+Every heuristic pass has a switch in Settings and every switch defaults on. The dictionary has
+no switch: it is not a heuristic, it is what the user typed in.
+
+**There is no language model anywhere in this app and there must not be one.** Every pass above
+is deterministic pattern matching, which is what makes them exhaustively testable — and what
+lets the app promise that nothing dictated ever leaves the machine.
+
+---
+
 ## Layout
 
 ```
@@ -79,15 +132,20 @@ windows/
 ├─ src/
 │  ├─ Murmur.Dictionary/          corrections + biasing          net10.0
 │  ├─ Murmur.Abstractions/        the four platform interfaces   net10.0
-│  ├─ Murmur.Core/                engine, segmenter, storage     net10.0
+│  ├─ Murmur.Core/                engine, segmenter, storage,
+│  │                              the text pipeline, snippets,
+│  │                              bar placement                   net10.0
 │  ├─ Murmur.Speech/              Parakeet via sherpa-onnx       net10.0
 │  ├─ Murmur.Testing/             fakes for the interfaces       net10.0
 │  ├─ Murmur.App/                 Avalonia UI                    net10.0
 │  └─ Murmur.Platform.Windows/    the ONLY Win32 code            net10.0-windows
 └─ tests/
    ├─ Murmur.Dictionary.Tests/    the shared vectors             24 tests
-   ├─ Murmur.Core.Tests/          engine, chunking, storage      26 tests
-   └─ Murmur.App.Tests/           headless Avalonia UI           13 tests
+   ├─ Murmur.Core.Tests/          engine, chunking, storage,
+   │                              every text pass and their
+   │                              interactions, placement       267 tests
+   └─ Murmur.App.Tests/           headless Avalonia UI,
+                                  rendered previews              65 tests
 ```
 
 **Only one project targets `-windows`.** Everything else is platform-neutral, so `CA1416`
@@ -122,7 +180,7 @@ builds and tests normally, including the full UI suite:
 
 ```bash
 cd windows
-dotnet test Murmur.CrossPlatform.slnf -c Release      # ~0.5s, 63 tests
+dotnet test Murmur.CrossPlatform.slnf -c Release      # ~10s, 356 tests
 ```
 
 `--no-incremental` is not optional in CI. Roslyn does not re-emit analyzer warnings on an
@@ -132,15 +190,18 @@ incremental build, so `-warnaserror` would pass on cached results and prove noth
 
 ## <a id="honesty"></a>Honesty about what is verified
 
-**Verified, on Windows, every push:** 63 tests pass — 24 dictionary (the shared vectors),
-26 core (dictation state machine, audio chunking, all three storage formats), 13 headless
-Avalonia UI. CI then publishes a self-contained ~116 MB executable, **runs it**, and the
+**Verified, on Windows, every push:** 356 tests pass — 24 dictionary (the shared vectors),
+267 core (dictation state machine, audio chunking, the storage formats, every text pass and the
+order they run in, floating-bar placement), 65 headless Avalonia UI. CI then publishes a self-contained ~116 MB executable, **runs it**, and the
 binary reports back that the dictionary works, the source-generated JSON round-trips, and
 the Windows platform layer loads and constructs out of the bundle.
 
-**Verified on macOS, in ~0.5s:** the same 63 tests. The UI genuinely runs headless here,
-which is why bugs like a `Render` method mutating a property get caught while writing them
-rather than three CI round-trips later.
+**Verified on macOS and Linux, in a few seconds:** the same 356 tests. The UI genuinely runs
+headless here — with Skia rather than the no-op drawing backend, so every `Render` is really
+executed — which is why bugs like a `Render` method mutating a property get caught while
+writing them rather than three CI round-trips later. The same run rasterises every screen to
+`artifacts/ui-preview/*.png`, which is the only way a redesign gets reviewed by someone who
+cannot run the app on Windows.
 
 **Known divergences between the two regex engines**, measured across 30 cases — 9 differed.
 The two that affect this code are both handled: culture-sensitive case-insensitive matching

@@ -48,6 +48,7 @@ public sealed class DictationEngine : IAsyncDisposable
     private readonly ITextInjector _injector;
     private readonly IClock _clock;
     private readonly Func<IReadOnlyList<DictionaryEntry>> _dictionary;
+    private readonly Func<TextPipelineOptions> _options;
 
     private readonly SemaphoreSlim _gate = new(1, 1);
     private CancellationTokenSource? _recording;
@@ -66,6 +67,18 @@ public sealed class DictationEngine : IAsyncDisposable
     /// <summary>Raised whenever <see cref="State"/> or <see cref="Level"/> changes.</summary>
     public event EventHandler? Changed;
 
+    /// <summary>
+    /// Raised when audio capture fails with anything other than cancellation.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="BeginAsync"/> runs fire-and-forget, so an exception thrown by the capture
+    /// implementation (e.g. the microphone refusing every format) would otherwise vanish as
+    /// an unobserved task exception — the meter simply never moves and nothing is reported.
+    /// The same failure is also appended to <c>%LocalAppData%/Murmur/last-capture-error.log</c>
+    /// so it can be inspected after the fact.
+    /// </remarks>
+    public event EventHandler<Exception>? CaptureFaulted;
+
     /// <summary>Wires the engine to its platform implementations.</summary>
     /// <param name="capture">Microphone source.</param>
     /// <param name="hotkey">Push-to-talk source.</param>
@@ -76,19 +89,26 @@ public sealed class DictationEngine : IAsyncDisposable
     /// a restart.
     /// </param>
     /// <param name="clock">Time source; defaults to the system clock.</param>
+    /// <param name="options">
+    /// Which text passes to run, read fresh on every utterance for the same reason the
+    /// dictionary is — a setting toggled in the Hub takes effect on the next dictation rather
+    /// than after a restart. Defaults to everything on.
+    /// </param>
     public DictationEngine(
         IAudioCapture capture,
         IHotkeySource hotkey,
         ITranscriber transcriber,
         ITextInjector injector,
         Func<IReadOnlyList<DictionaryEntry>> dictionary,
-        IClock? clock = null)
+        IClock? clock = null,
+        Func<TextPipelineOptions>? options = null)
     {
         _capture = capture;
         _hotkey = hotkey;
         _transcriber = transcriber;
         _injector = injector;
         _dictionary = dictionary;
+        _options = options ?? (static () => new TextPipelineOptions());
         _clock = clock ?? SystemClock.Instance;
 
         _hotkey.Pressed += OnPressed;
@@ -154,6 +174,14 @@ public sealed class DictationEngine : IAsyncDisposable
         {
             // Normal: the key was released.
         }
+        catch (Exception ex)
+        {
+            // Capture failed outright (e.g. no format the device accepts). Without this the
+            // exception would be swallowed as an unobserved task fault and the app would look
+            // merely inert. Log first so the failure is recorded even if no one subscribes.
+            LogCaptureError(ex);
+            CaptureFaulted?.Invoke(this, ex);
+        }
         finally
         {
             // Authoritative: this runs only once the capture loop has genuinely finished, so
@@ -186,6 +214,16 @@ public sealed class DictationEngine : IAsyncDisposable
         try
         {
             await ProcessAsync(samples).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            // EndAsync runs fire-and-forget off the hotkey thread, so nothing above this
+            // frame ever observes the task. Without this catch, any failure in the
+            // transcribe → complete → inject pipeline becomes an unobserved task exception:
+            // the app looks merely inert, exactly like the shipped bug where a UI-thread
+            // violation in a Completed subscriber silently blocked injection. Log it so the
+            // whole class of "completion died silently" failures leaves a trace on disk.
+            LogPipelineError("Dictation processing failed", ex);
         }
         finally
         {
@@ -222,19 +260,109 @@ public sealed class DictationEngine : IAsyncDisposable
         var raw = string.Join(' ', transcripts);
         if (string.IsNullOrWhiteSpace(raw)) return;
 
-        // The dictionary runs last and unconditionally. Biasing only raises the odds of the
-        // right word; this is the pass that guarantees it.
-        var (corrected, applied) = new DictionaryCorrector(entries).Apply(raw);
+        // Everything that happens to the text between the recogniser and the keyboard lives in
+        // TextPipeline: filler removal, the dictionary, spoken retractions, the trailing
+        // command, snippet expansion and list formatting, in that order and for the reasons
+        // documented there. All of it is deterministic pattern matching — this pipeline
+        // contains no language model and must not acquire one. It runs before injection so the
+        // typed text and the saved transcript are the same string.
+        var processed = TextPipeline.Run(raw, _options() with
+        {
+            Dictionary = entries,
+        });
+
+        var formatted = processed.Text;
+
+        // The whole utterance was hesitation, or a bare "press enter" with nothing to type.
+        // Empty text must never be injected, and an empty transcript is not worth recording.
+        if (string.IsNullOrWhiteSpace(formatted))
+        {
+            if (processed.Submit) await SubmitAsync().ConfigureAwait(false);
+            return;
+        }
 
         var result = new DictationResult(
             At: releasedAt,
             AudioDuration: TimeSpan.FromSeconds((double)audio.Length / AudioChunk.SampleRate),
             ProcessingTime: _clock.Now - releasedAt,
-            Text: corrected,
-            Corrections: applied);
+            Text: formatted,
+            Corrections: processed.Corrections);
 
-        Completed?.Invoke(this, result);
-        await _injector.InjectAsync(corrected, CancellationToken.None).ConfigureAwait(false);
+        // Subscribers run synchronously on this background thread, and injection must not
+        // depend on any of them succeeding. This ordering (Completed first) is deliberate —
+        // the history subscriber persists the text, so even a failing injector never loses
+        // a dictation — but a subscriber failure (e.g. a UI-thread violation) must equally
+        // never block the text from reaching the focused app, hence the isolation here.
+        try
+        {
+            Completed?.Invoke(this, result);
+        }
+        catch (Exception ex)
+        {
+            LogPipelineError("Completed subscriber failed", ex);
+        }
+
+        await _injector.InjectAsync(formatted, CancellationToken.None).ConfigureAwait(false);
+
+        // Enter goes last, after the text has landed. Ordering matters here in a way that is
+        // easy to get wrong: submitting first would send an empty message.
+        if (processed.Submit) await SubmitAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Presses Enter in the focused application.
+    /// </summary>
+    /// <remarks>
+    /// Isolated, because the keystroke is a nice-to-have on top of a dictation that has already
+    /// succeeded. An injector that cannot deliver a keypress must not turn a completed
+    /// dictation into a logged failure.
+    /// </remarks>
+    private async Task SubmitAsync()
+    {
+        try
+        {
+            await _injector.PressEnterAsync(CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            LogPipelineError("Pressing Enter failed", ex);
+        }
+    }
+
+    /// <summary>Appends a capture failure to a small diagnostic log.</summary>
+    /// <remarks>
+    /// The app is a WinExe with no console, so a file is the only way to inspect the failure
+    /// from outside a running instance. Best-effort by design: a logging problem must never
+    /// crash the engine or mask the original error, so any write failure is swallowed.
+    /// </remarks>
+    private static void LogCaptureError(Exception ex) =>
+        AppendLog("last-capture-error.log", ex.ToString());
+
+    /// <summary>Appends a completion-pipeline failure to the crash log.</summary>
+    /// <remarks>
+    /// Same file and format as the app layer's <c>CrashLog</c>, deliberately: a failure here
+    /// means "a dictation died after the key was released", which is an app-broke event, not
+    /// a per-recording capture problem — those go to <c>last-capture-error.log</c>.
+    /// </remarks>
+    private static void LogPipelineError(string context, Exception ex) =>
+        AppendLog("last-crash.log", $"{context}: {ex}");
+
+    private static void AppendLog(string fileName, string message)
+    {
+        try
+        {
+            var directory = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "Murmur");
+            Directory.CreateDirectory(directory);
+            File.AppendAllText(
+                Path.Combine(directory, fileName),
+                $"[{DateTimeOffset.Now:O}] {message}{Environment.NewLine}");
+        }
+        catch
+        {
+            // Never let logging failure hide the real problem.
+        }
     }
 
     private void SetState(DictationState state)

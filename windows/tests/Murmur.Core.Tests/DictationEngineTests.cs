@@ -126,6 +126,177 @@ public sealed class DictationEngineTests
         engine.Level.ShouldBe(0);
     }
 
+    [Fact]
+    public async Task A_dictated_enumeration_is_injected_as_a_real_list()
+    {
+        // The reported bug: a spoken list arrived as one run-on sentence. The list pass runs
+        // inside the engine, so the text that reaches the focused app is already structured.
+        var hotkey = new FakeHotkeySource();
+        var injector = new RecordingTextInjector();
+
+        await using var engine = Build(
+            FakeAudioCapture.Tone(1.0), hotkey,
+            new FakeTranscriber("one apples two bananas three oranges"), injector);
+
+        DictationResult? completed = null;
+        engine.Completed += (_, r) => completed = r;
+
+        await DictateAsync(hotkey, engine);
+
+        injector.Injected.ShouldHaveSingleItem();
+        injector.Injected[0].ShouldBe("1. Apples\n2. Bananas\n3. Oranges");
+
+        // The saved transcript and the typed text must be the same string — a history that
+        // shows something other than what was typed is worse than no history.
+        completed.ShouldNotBeNull();
+        completed.Text.ShouldBe(injector.Injected[0]);
+    }
+
+    [Fact]
+    public async Task The_list_pass_runs_after_the_dictionary_not_before_it()
+    {
+        // A correction whose replacement spans a would-be item boundary must still fire: the
+        // dictionary sees flat text, and only then is the text broken into lines.
+        var hotkey = new FakeHotkeySource();
+        var injector = new RecordingTextInjector();
+
+        await using var engine = Build(
+            FakeAudioCapture.Tone(1.0), hotkey,
+            new FakeTranscriber("one cloud code two vercel"), injector,
+            DictionaryEntry.Correction("cloud code", "Claude Code"));
+
+        await DictateAsync(hotkey, engine);
+
+        injector.Injected[0].ShouldBe("1. Claude Code\n2. Vercel");
+    }
+
+    [Fact]
+    public async Task Ordinary_prose_is_injected_untouched()
+    {
+        var hotkey = new FakeHotkeySource();
+        var injector = new RecordingTextInjector();
+
+        await using var engine = Build(
+            FakeAudioCapture.Tone(1.0), hotkey,
+            new FakeTranscriber("the first time I met her was in Paris"), injector);
+
+        await DictateAsync(hotkey, engine);
+
+        injector.Injected[0].ShouldBe("the first time I met her was in Paris");
+    }
+
+    [Fact]
+    public async Task A_trailing_press_enter_submits_after_the_text_has_landed()
+    {
+        // Order is the thing worth asserting: pressing Enter before the text arrives sends an
+        // empty message, which is far more visible than not sending one at all.
+        var hotkey = new FakeHotkeySource();
+        var injector = new RecordingTextInjector();
+
+        await using var engine = Build(
+            FakeAudioCapture.Tone(1.0), hotkey,
+            new FakeTranscriber("Tell Dave I am running late. Press enter."), injector);
+
+        await DictateAsync(hotkey, engine);
+
+        injector.Injected.ShouldHaveSingleItem();
+        injector.Injected[0].ShouldBe("Tell Dave I am running late.");
+        injector.EnterPresses.ShouldBe(1);
+        injector.InjectedCountAtFirstEnter.ShouldBe(1, "Enter must come after the text");
+    }
+
+    [Fact]
+    public async Task A_bare_press_enter_submits_without_typing_anything()
+    {
+        var hotkey = new FakeHotkeySource();
+        var injector = new RecordingTextInjector();
+
+        await using var engine = Build(
+            FakeAudioCapture.Tone(1.0), hotkey, new FakeTranscriber("Press enter."), injector);
+
+        await DictateAsync(hotkey, engine);
+
+        injector.Injected.ShouldBeEmpty("empty text must never be injected");
+        injector.EnterPresses.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task An_utterance_of_pure_hesitation_types_nothing_and_records_nothing()
+    {
+        var hotkey = new FakeHotkeySource();
+        var injector = new RecordingTextInjector();
+
+        await using var engine = Build(
+            FakeAudioCapture.Tone(1.0), hotkey, new FakeTranscriber("Um, uh, er."), injector);
+
+        DictationResult? completed = null;
+        engine.Completed += (_, r) => completed = r;
+
+        await DictateAsync(hotkey, engine);
+
+        injector.Injected.ShouldBeEmpty();
+        injector.EnterPresses.ShouldBe(0);
+        completed.ShouldBeNull("an empty transcript is not worth recording");
+    }
+
+    [Fact]
+    public async Task Prose_that_mentions_pressing_enter_is_typed_rather_than_obeyed()
+    {
+        var hotkey = new FakeHotkeySource();
+        var injector = new RecordingTextInjector();
+
+        await using var engine = Build(
+            FakeAudioCapture.Tone(1.0), hotkey,
+            new FakeTranscriber("To submit the form, press enter"), injector);
+
+        await DictateAsync(hotkey, engine);
+
+        injector.Injected[0].ShouldBe("To submit the form, press enter");
+        injector.EnterPresses.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task Turning_a_pass_off_in_settings_reaches_the_very_next_dictation()
+    {
+        // Options are read fresh per utterance, for the same reason the dictionary is: a toggle
+        // flipped in the Hub must not need a restart.
+        var hotkey = new FakeHotkeySource();
+        var injector = new RecordingTextInjector();
+        var removeFillers = true;
+
+        await using var engine = new DictationEngine(
+            FakeAudioCapture.Tone(1.0), hotkey, new FakeTranscriber("So um it is fine"),
+            injector, () => [], new FakeClock(),
+            () => new TextPipelineOptions { RemoveFillers = removeFillers });
+
+        await DictateAsync(hotkey, engine);
+        injector.Injected[^1].ShouldBe("So it is fine");
+
+        removeFillers = false;
+
+        await DictateAsync(hotkey, engine);
+        injector.Injected[^1].ShouldBe("So um it is fine");
+    }
+
+    [Fact]
+    public async Task A_snippet_expands_on_its_way_to_the_focused_app()
+    {
+        var hotkey = new FakeHotkeySource();
+        var injector = new RecordingTextInjector();
+
+        await using var engine = new DictationEngine(
+            FakeAudioCapture.Tone(1.0), hotkey,
+            new FakeTranscriber("Send it to my address please"), injector, () => [], new FakeClock(),
+            () => new TextPipelineOptions
+            {
+                Snippets = [new SnippetEntry { Trigger = "my address", Text = "12 Bridge Street" }],
+            });
+
+        await DictateAsync(hotkey, engine);
+
+        injector.Injected[0].ShouldBe("Send it to 12 Bridge Street please");
+    }
+
     /// <summary>
     /// The boundary is enforced by the compiler via CA1416, but this fails louder and names
     /// the reason: anything reachable from Core must run in CI on any platform.

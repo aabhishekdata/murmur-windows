@@ -156,12 +156,45 @@ public sealed class RecordingTextInjector : ITextInjector
     /// <summary>Everything injected, in order.</summary>
     public List<string> Injected { get; } = [];
 
+    /// <summary>How many times Enter was pressed.</summary>
+    public int EnterPresses { get; private set; }
+
+    /// <summary>
+    /// How many characters had been injected by the time Enter was first pressed.
+    /// </summary>
+    /// <remarks>
+    /// Order is the thing worth asserting about a submit: pressing Enter before the text has
+    /// landed sends an empty message, which is a far more visible failure than not sending one.
+    /// </remarks>
+    public int InjectedCountAtFirstEnter { get; private set; } = -1;
+
     /// <inheritdoc />
     public ValueTask<bool> InjectAsync(string text, CancellationToken cancellationToken)
     {
         Injected.Add(text);
         return ValueTask.FromResult(true);
     }
+
+    /// <inheritdoc />
+    public ValueTask<bool> PressEnterAsync(CancellationToken cancellationToken)
+    {
+        if (EnterPresses == 0) InjectedCountAtFirstEnter = Injected.Count;
+        EnterPresses++;
+        return ValueTask.FromResult(true);
+    }
+}
+
+/// <summary>A microphone list you write by hand.</summary>
+public sealed class FakeAudioDeviceCatalog : IAudioDeviceCatalog
+{
+    private readonly IReadOnlyList<AudioDeviceInfo> _devices;
+
+    /// <summary>Reports the given devices.</summary>
+    /// <param name="devices">What <see cref="List"/> should return.</param>
+    public FakeAudioDeviceCatalog(params AudioDeviceInfo[] devices) => _devices = devices;
+
+    /// <inheritdoc />
+    public IReadOnlyList<AudioDeviceInfo> List() => _devices;
 }
 
 /// <summary>A clock you advance by hand.</summary>

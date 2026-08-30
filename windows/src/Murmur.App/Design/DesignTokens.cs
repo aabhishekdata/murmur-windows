@@ -9,203 +9,229 @@ namespace Murmur.App.Design;
 /// </summary>
 /// <remarks>
 /// <para>
-/// A direct port of <c>DesignSystem.swift</c> — same names, same values, so the two platforms
-/// stay recognisably one product. Direction: 1980s portable field recorders and cassette
-/// decks. Equipment, not theme.
+/// Direction: a quiet, modern dictation utility. Two surfaces, and they are deliberately
+/// different materials:
 /// </para>
+/// <list type="bullet">
+/// <item><b>The bar</b> — the floating pill that lives above every other window — is a dark,
+/// softly-lit object with white level bars. It has to read instantly against a bright document,
+/// a dark editor or a video call, and dark-on-anything is the only value that always does.</item>
+/// <item><b>The hub</b> — the management window — is light, neutral and mostly white space.
+/// It is a place you visit occasionally to read your own words back.</item>
+/// </list>
 /// <para>
 /// <b>Views must not contain literal values.</b> If a control needs a number that isn't here,
 /// add the token rather than inlining it.
 /// </para>
-/// <para>Two rules that are not negotiable:</para>
+/// <para>Three rules that are not negotiable:</para>
 /// <list type="bullet">
-/// <item><b>Red means recording.</b> Nothing else in the app is red.</item>
-/// <item><b>Amber and green are instrumentation only</b> — level meters, never UI chrome.</item>
+/// <item><b>The bar is dark in both themes.</b> It is an object floating over other people's
+/// applications, not a panel inside ours, so it does not follow the system appearance.</item>
+/// <item><b>One accent colour, used sparingly.</b> Selection, focus and the live indicator.
+/// Nothing else is coloured.</item>
+/// <item><b>No skeuomorphism.</b> No bevels, no drawn grain, no fake screws, no needles.
+/// Depth comes from a single soft shadow and one hairline border.</item>
 /// </list>
 /// <para>
-/// Explicitly ruled out: neon, vaporwave, synthwave, purple/pink gradients, glowing text,
-/// chrome lettering, grid horizons. There are <b>no gradients anywhere</b>; depth comes from
-/// flat panels, hairline bevels and procedurally-drawn brushed grain.
+/// This replaces the previous "vintage tape deck" language wholesale. It is deliberately one
+/// system rather than two: a token file with both palettes in it is how a redesign quietly
+/// becomes a hybrid.
 /// </para>
 /// </remarks>
 public static class Tokens
 {
-    /// <summary>
-    /// Whether the black-face palette is in use.
-    /// </summary>
+    /// <summary>Whether the hub is showing its dark palette.</summary>
     /// <remarks>
-    /// Decks shipped in two finishes, so the app does too: <b>silver face</b> (brushed
-    /// aluminium, the Sony TC-D5) in light, <b>black face</b> (matte, the Marantz PMD) in dark.
+    /// Only the hub and its dialogs follow this. The floating bar is dark either way.
     /// </remarks>
-    public static bool IsBlackFace =>
+    public static bool IsDark =>
         Application.Current?.ActualThemeVariant == ThemeVariant.Dark;
 
     // ---- Colour ----
 
-    /// <summary>Surfaces, from the outer body inward.</summary>
+    /// <summary>Surfaces, from the window backdrop inward.</summary>
     public static class Colors
     {
-        /// <summary>The outer body of the unit. Darkest surface; frames everything.</summary>
-        public static Color Chassis => Face(0x2A2825, 0x121110);
+        /// <summary>The hub window's backdrop.</summary>
+        public static Color Canvas => Theme(0xFAFAF8, 0x161618);
 
-        /// <summary>The main working surface.</summary>
-        public static Color Panel => Face(0xB8B4AD, 0x2E2C29);
+        /// <summary>Cards, rows and fields sitting on the canvas.</summary>
+        public static Color Surface => Theme(0xFFFFFF, 0x1F1F22);
 
-        /// <summary>Top bevel highlight on a raised element.</summary>
-        public static Color PanelHighlight => Face(0xC9C5BE, 0x3C3936);
+        /// <summary>A quieter surface — the sidebar, section headers, empty states.</summary>
+        public static Color SurfaceMuted => Theme(0xF3F3F0, 0x1A1A1D);
 
-        /// <summary>Bottom bevel shade on a raised element.</summary>
-        public static Color PanelShade => Face(0x9E9A93, 0x211F1D);
+        /// <summary>Row under the pointer.</summary>
+        public static Color Hover => Theme(0xEFEFEB, 0x26262A);
 
-        /// <summary>Recessed wells, set into the panel.</summary>
-        public static Color Well => Face(0x6E6A64, 0x1A1917);
+        /// <summary>The selected navigation item.</summary>
+        public static Color Selected => Theme(0xE9E9FB, 0x2A2A3C);
 
-        /// <summary>The dark readout window of a tape deck.</summary>
-        public static Color Deck => Face(0x38352F, 0x151412);
+        /// <summary>The one hairline that separates anything from anything.</summary>
+        public static Color Line => Theme(0xE6E5E0, 0x2C2C31);
 
-        /// <summary>Button caps and other moulded plastic.</summary>
-        public static Color Cap => Face(0xE8E3D8, 0x35322E);
+        /// <summary>Primary text.</summary>
+        public static Color Ink => Theme(0x1A1A18, 0xF2F2EF);
 
-        /// <summary>The hard line where two panels meet.</summary>
-        public static Color Seam => Face(0x6B6862, 0x000000);
+        /// <summary>Supporting text — timestamps, counts, captions.</summary>
+        public static Color InkMuted => Theme(0x6B6A64, 0x9C9C97);
 
-        /// <summary>Primary readable text.</summary>
-        public static Color Ink => Face(0x1C1A17, 0xE4DED0);
+        /// <summary>Placeholder and disabled text.</summary>
+        public static Color InkFaint => Theme(0x9C9A94, 0x6A6A68);
 
-        /// <summary>Supporting text.</summary>
-        public static Color InkSecondary => Face(0x514D47, 0x9A948A);
+        /// <summary>
+        /// The accent. Selection, focus, the live indicator, the primary button.
+        /// </summary>
+        /// <remarks>
+        /// One colour, and only in those four places. A second accent is how a minimal
+        /// interface stops being one.
+        /// </remarks>
+        public static Color Accent => Theme(0x5B5BD6, 0x8A8AF0);
 
-        /// <summary>Silkscreened labels printed onto the panel.</summary>
-        public static Color Silkscreen => Face(0x3A3630, 0xB0AA9E);
+        /// <summary>A wash of the accent, for the selected navigation row.</summary>
+        public static Color AccentSoft => Theme(0xEDEDFC, 0x25253A);
 
-        /// <summary>Text on a dark readout well, regardless of face.</summary>
-        public static Color InkOnDeck => Rgb(0xD8D2C4);
+        /// <summary>Text and glyphs sitting on the accent.</summary>
+        public static Color OnAccent => Rgb(0xFFFFFF);
 
-        /// <summary>The record lamp. Lacquered, not fluorescent. The only red in the app.</summary>
-        public static Color Record => Rgb(0xC8342A);
+        /// <summary>Attention without alarm — the missing-model notice.</summary>
+        public static Color Notice => Theme(0xB4791F, 0xE0A94A);
 
-        /// <summary>The record lamp unlit — a dark lens, not an absence.</summary>
-        public static Color RecordIdle => Face(0x7A4A45, 0x4A2724);
+        /// <summary>A wash of <see cref="Notice"/>.</summary>
+        public static Color NoticeSoft => Theme(0xFBF3E2, 0x2E2618);
 
-        /// <summary>A selected row. The panel lifts rather than tints.</summary>
-        public static Color Selection => Face(0xCDC8C0, 0x3A3733);
+        /// <summary>Destructive actions, and the live-recording dot.</summary>
+        public static Color Live => Theme(0xD3453B, 0xE8635A);
 
-        /// <summary>Edge on a selected or focused element.</summary>
-        public static Color SelectionEdge => Face(0x8A857D, 0x585349);
+        // ---- The floating bar. Fixed values: it is dark in both themes. ----
 
-        /// <summary>Keyboard focus ring. Reads without relying on colour.</summary>
-        public static Color FocusRing => Face(0x6B665E, 0x726C61);
+        /// <summary>The bar's body.</summary>
+        public static Color BarBody => Rgb(0x1B1B1F);
 
-        /// <summary>Row under the pointer, before selection.</summary>
-        public static Color Hover => Face(0xC2BDB6, 0x343130);
+        /// <summary>The bar's body while listening — a shade lighter, so the state reads.</summary>
+        public static Color BarBodyActive => Rgb(0x232329);
 
-        // Instrumentation only. Never use these for UI chrome.
+        /// <summary>The bar's hairline edge, which is what keeps it from vanishing on black.</summary>
+        public static Color BarEdge => Rgb(0x3A3A42);
 
-        /// <summary>Classic cream VU face.</summary>
-        public static Color MeterFace => Rgb(0xD8CFB4);
+        /// <summary>Text on the bar.</summary>
+        public static Color BarInk => Rgb(0xEDEDF2);
 
-        /// <summary>The amber lamp behind a VU face.</summary>
-        public static Color MeterLamp => Rgb(0xE8B860);
+        /// <summary>Secondary text on the bar.</summary>
+        public static Color BarInkMuted => Rgb(0x8E8E9A);
 
-        /// <summary>Needle and scale printing.</summary>
-        public static Color MeterNeedle => Rgb(0x1C1A17);
+        /// <summary>The level bars. White, which is the whole visual signature of the thing.</summary>
+        public static Color BarWave => Rgb(0xFFFFFF);
 
-        /// <summary>Nominal level.</summary>
-        public static Color MeterGreen => Rgb(0x6F9E45);
-
-        /// <summary>Approaching peak.</summary>
-        public static Color MeterAmber => Rgb(0xD39A2E);
-
-        /// <summary>Over.</summary>
-        public static Color MeterRed => Rgb(0xC0392B);
+        /// <summary>The level bars at rest — present, but clearly not listening.</summary>
+        public static Color BarWaveIdle => Rgb(0x6E6E7A);
 
         private static Color Rgb(uint hex) => Color.FromRgb(
             (byte)((hex >> 16) & 0xFF), (byte)((hex >> 8) & 0xFF), (byte)(hex & 0xFF));
 
-        private static Color Face(uint light, uint dark) => Rgb(IsBlackFace ? dark : light);
+        private static Color Theme(uint light, uint dark) => Rgb(IsDark ? dark : light);
     }
 
     /// <summary>Brushes for the colours above, allocated per call.</summary>
     public static class Brushes
     {
-        /// <inheritdoc cref="Colors.Chassis"/>
-        public static IBrush Chassis => new SolidColorBrush(Colors.Chassis);
+        /// <inheritdoc cref="Colors.Canvas"/>
+        public static IBrush Canvas => new SolidColorBrush(Colors.Canvas);
 
-        /// <inheritdoc cref="Colors.Panel"/>
-        public static IBrush Panel => new SolidColorBrush(Colors.Panel);
+        /// <inheritdoc cref="Colors.Surface"/>
+        public static IBrush Surface => new SolidColorBrush(Colors.Surface);
 
-        /// <inheritdoc cref="Colors.Well"/>
-        public static IBrush Well => new SolidColorBrush(Colors.Well);
+        /// <inheritdoc cref="Colors.SurfaceMuted"/>
+        public static IBrush SurfaceMuted => new SolidColorBrush(Colors.SurfaceMuted);
 
-        /// <inheritdoc cref="Colors.Deck"/>
-        public static IBrush Deck => new SolidColorBrush(Colors.Deck);
-
-        /// <inheritdoc cref="Colors.Cap"/>
-        public static IBrush Cap => new SolidColorBrush(Colors.Cap);
+        /// <inheritdoc cref="Colors.Line"/>
+        public static IBrush Line => new SolidColorBrush(Colors.Line);
 
         /// <inheritdoc cref="Colors.Ink"/>
         public static IBrush Ink => new SolidColorBrush(Colors.Ink);
 
-        /// <inheritdoc cref="Colors.Silkscreen"/>
-        public static IBrush Silkscreen => new SolidColorBrush(Colors.Silkscreen);
+        /// <inheritdoc cref="Colors.InkMuted"/>
+        public static IBrush InkMuted => new SolidColorBrush(Colors.InkMuted);
 
-        /// <inheritdoc cref="Colors.InkOnDeck"/>
-        public static IBrush InkOnDeck => new SolidColorBrush(Colors.InkOnDeck);
+        /// <inheritdoc cref="Colors.InkFaint"/>
+        public static IBrush InkFaint => new SolidColorBrush(Colors.InkFaint);
 
-        /// <inheritdoc cref="Colors.Record"/>
-        public static IBrush Record => new SolidColorBrush(Colors.Record);
+        /// <inheritdoc cref="Colors.Accent"/>
+        public static IBrush Accent => new SolidColorBrush(Colors.Accent);
 
-        /// <inheritdoc cref="Colors.MeterFace"/>
-        public static IBrush MeterFace => new SolidColorBrush(Colors.MeterFace);
+        /// <inheritdoc cref="Colors.AccentSoft"/>
+        public static IBrush AccentSoft => new SolidColorBrush(Colors.AccentSoft);
+
+        /// <inheritdoc cref="Colors.OnAccent"/>
+        public static IBrush OnAccent => new SolidColorBrush(Colors.OnAccent);
+
+        /// <inheritdoc cref="Colors.Notice"/>
+        public static IBrush Notice => new SolidColorBrush(Colors.Notice);
+
+        /// <inheritdoc cref="Colors.NoticeSoft"/>
+        public static IBrush NoticeSoft => new SolidColorBrush(Colors.NoticeSoft);
+
+        /// <inheritdoc cref="Colors.Live"/>
+        public static IBrush Live => new SolidColorBrush(Colors.Live);
+
+        /// <inheritdoc cref="Colors.BarBody"/>
+        public static IBrush BarBody => new SolidColorBrush(Colors.BarBody);
+
+        /// <inheritdoc cref="Colors.BarInk"/>
+        public static IBrush BarInk => new SolidColorBrush(Colors.BarInk);
+
+        /// <inheritdoc cref="Colors.BarInkMuted"/>
+        public static IBrush BarInkMuted => new SolidColorBrush(Colors.BarInkMuted);
     }
 
     // ---- Type ----
 
     /// <summary>
-    /// A neutral grotesque, the way equipment was labelled.
+    /// One family, five sizes.
     /// </summary>
     /// <remarks>
-    /// Helvetica on macOS, Arial on Windows — the closest widely-installed grotesques. A
-    /// humanist UI font has rounded terminals that fight the silkscreen look.
+    /// Inter is embedded in the app (<c>WithInterFont</c>), so it renders identically on a
+    /// clean Windows install and on a headless CI runner — which is what makes the rendered
+    /// screenshots in <c>artifacts/ui-preview</c> worth looking at.
     /// </remarks>
     public static class Fonts
     {
-        /// <summary>The panel typeface.</summary>
-        public static FontFamily Grotesque { get; } =
-            new("Helvetica Neue, Helvetica, Arial, sans-serif");
+        /// <summary>The interface typeface.</summary>
+        public static FontFamily Ui { get; } =
+            new("Inter, Segoe UI, -apple-system, Helvetica Neue, sans-serif");
 
-        /// <summary>Readouts and timings. Monospaced so digits don't shift as they tick.</summary>
+        /// <summary>Timings and counters. Monospaced so digits don't shift as they tick.</summary>
         public static FontFamily Mono { get; } =
-            new("Consolas, Menlo, SF Mono, monospace");
+            new("Cascadia Mono, Consolas, SF Mono, Menlo, monospace");
 
-        /// <summary>Panel labels: small, uppercase, tightly tracked.</summary>
-        public const double Silkscreen = 9;
+        /// <summary>Micro-labels: counts, timestamps, chips.</summary>
+        public const double Caption = 11;
 
-        /// <summary>A larger silkscreen label, for section headers.</summary>
-        public const double SilkscreenLarge = 11;
+        /// <summary>Secondary text and section headers.</summary>
+        public const double Label = 12;
 
-        /// <summary>Caption text.</summary>
-        public const double Caption = 10;
+        /// <summary>Body text — transcripts, dictionary entries, settings copy.</summary>
+        public const double Body = 13.5;
 
-        /// <summary>Secondary label text.</summary>
-        public const double Label = 11;
-
-        /// <summary>Body text.</summary>
-        public const double Body = 13;
+        /// <summary>Emphasised body — a navigation item, a card title.</summary>
+        public const double Subtitle = 15;
 
         /// <summary>Section titles.</summary>
-        public const double Title = 17;
+        public const double Title = 21;
 
-        /// <summary>The big transport counter.</summary>
-        public const double CounterLarge = 26;
+        /// <summary>A single statistic, standing alone.</summary>
+        public const double Display = 30;
 
-        /// <summary>Letter spacing for silkscreen labels, in device-independent pixels.</summary>
-        public const double SilkscreenTracking = 1.1;
+        /// <summary>Tracking for small uppercase headers, in device-independent pixels.</summary>
+        public const double HeaderTracking = 0.6;
+
+        /// <summary>Line height multiplier for wrapped body copy.</summary>
+        public const double BodyLineHeight = 1.45;
     }
 
     // ---- Geometry ----
 
-    /// <summary>A 4pt grid. Panels are laid out on it; nothing sits between steps.</summary>
+    /// <summary>A 4pt grid. Nothing sits between steps.</summary>
     public static class Space
     {
         /// <summary>2</summary>
@@ -227,131 +253,176 @@ public static class Tokens
         public const double Wide = 24;
 
         /// <summary>32</summary>
-        public const double Panel = 32;
+        public const double Section = 32;
+
+        /// <summary>48</summary>
+        public const double Page = 48;
     }
 
     /// <summary>
-    /// Small by design. Equipment has hard edges; anything soft reads as software.
+    /// Generous by design. Soft edges are what separate a piece of software from a machine.
     /// </summary>
     public static class Radius
     {
-        /// <summary>Seams and dividers — square.</summary>
+        /// <summary>Dividers — square.</summary>
         public const double None = 0;
 
-        /// <summary>Indicator chips, small lamps.</summary>
-        public const double Chip = 2;
+        /// <summary>Chips and badges.</summary>
+        public const double Chip = 6;
 
-        /// <summary>Button caps and controls.</summary>
-        public const double Control = 3;
+        /// <summary>Buttons, fields, navigation rows.</summary>
+        public const double Control = 9;
 
-        /// <summary>Recessed wells and grouped panels.</summary>
-        public const double Panel = 5;
+        /// <summary>Cards and grouped panels.</summary>
+        public const double Card = 13;
 
-        /// <summary>The window itself.</summary>
-        public const double Window = 8;
+        /// <summary>The hub window.</summary>
+        public const double Window = 14;
+
+        /// <summary>
+        /// The floating bar. Large enough that the shape is read as a pill at any size.
+        /// </summary>
+        public const double Pill = 999;
     }
 
-    /// <summary>Line weights. All 1 — a machined edge reads the same at any density.</summary>
+    /// <summary>Line weights. One hairline, everywhere.</summary>
     public static class Border
     {
-        /// <summary>A drawn hairline.</summary>
+        /// <summary>The only border thickness in the app.</summary>
         public const double Hairline = 1;
 
-        /// <summary>The seam between two panels.</summary>
-        public const double Seam = 1;
-
-        /// <summary>Bevel thickness on raised controls.</summary>
-        public const double Bevel = 1;
+        /// <summary>The focus ring, which has to be visible without colour.</summary>
+        public const double Focus = 2;
     }
 
-    // ---- Material ----
+    // ---- The floating bar ----
 
     /// <summary>
-    /// The physical detail that makes a panel read as a machined object: metal grain,
-    /// fasteners, ventilation, lamps, key travel, needle sweep.
+    /// The dimensions and behaviour of the pill that floats above every other window.
     /// </summary>
-    public static class Material
+    /// <remarks>
+    /// The bar changes size with state — idle is unobtrusive, listening makes room for the
+    /// level bars and a cancel target — so the window is resized and re-docked on every state
+    /// change rather than reserving the largest footprint and leaving transparent dead space
+    /// that would swallow clicks meant for the window underneath.
+    /// </remarks>
+    public static class Bar
     {
-        /// <summary>Opacity of the lighter striations in brushed metal.</summary>
-        public const double GrainLight = 0.055;
+        /// <summary>Height of the horizontal pill.</summary>
+        public const double Height = 40;
 
-        /// <summary>Opacity of the darker striations.</summary>
-        public const double GrainDark = 0.07;
+        /// <summary>
+        /// Width at rest.
+        /// </summary>
+        /// <remarks>
+        /// Sized to the level bars and the state dot, and nothing else. The wordmark is dropped
+        /// at rest deliberately: idle is the state the bar spends its life in, and a widget
+        /// that sits over other people's work all day should take up as little of it as it can.
+        /// </remarks>
+        public const double IdleWidth = 124;
 
-        /// <summary>Distance between striations.</summary>
-        public const double GrainPitch = 2;
+        /// <summary>Width while listening — room for the level bars and a cancel target.</summary>
+        public const double ListeningWidth = 180;
 
-        /// <summary>Diameter of a panel screw head.</summary>
-        public const double ScrewSize = 9;
+        /// <summary>Width while the utterance is being transcribed, with a word to explain it.</summary>
+        public const double ProcessingWidth = 168;
 
-        /// <summary>A single vent slot.</summary>
-        public const double VentSlotWidth = 3;
+        /// <summary>Inner padding along the long axis.</summary>
+        public const double PaddingLong = 14;
 
-        /// <summary>Height of a vent slot.</summary>
-        public const double VentSlotHeight = 22;
+        /// <summary>Inner padding across the short axis.</summary>
+        public const double PaddingShort = 6;
 
-        /// <summary>Gap between vent slots.</summary>
-        public const double VentSlotGap = 4;
+        /// <summary>How far the drop shadow reaches. The bar's only depth cue.</summary>
+        public const double ShadowBlur = 22;
 
-        /// <summary>Indicator lamp diameter.</summary>
-        public const double LampSize = 7;
+        /// <summary>How far the shadow is offset downward.</summary>
+        public const double ShadowOffset = 4;
 
-        /// <summary>A lit lamp's lens highlight — a specular dot, not a bloom.</summary>
-        public const double LampSpecular = 0.45;
+        /// <summary>Shadow opacity.</summary>
+        public const double ShadowOpacity = 0.28;
 
-        /// <summary>How far an unlit lamp sits below the lit value.</summary>
-        public const double LampUnlitOpacity = 0.22;
+        /// <summary>Diameter of the state dot at the leading end of the bar.</summary>
+        public const double DotSize = 8;
+    }
 
-        /// <summary>Transport key height.</summary>
-        public const double KeyHeight = 34;
+    /// <summary>
+    /// The level display: a row of rounded bars that rise and fall with the voice.
+    /// </summary>
+    /// <remarks>
+    /// This replaces the VU needle outright. A needle is an instrument; these are the "moving
+    /// white bars" a modern dictation bar shows, and they read at 20 pixels tall where a
+    /// needle does not.
+    /// </remarks>
+    public static class Wave
+    {
+        /// <summary>How many bars are drawn.</summary>
+        public const int BarCount = 13;
 
-        /// <summary>Minimum transport key width.</summary>
-        public const double KeyMinWidth = 52;
+        /// <summary>Width of one bar.</summary>
+        public const double BarWidth = 3;
 
-        /// <summary>How far a key sinks when pressed.</summary>
-        public const double KeyTravel = 1.5;
+        /// <summary>Gap between bars.</summary>
+        public const double BarGap = 3;
 
-        /// <summary>Total sweep of the VU needle, in degrees, centred on vertical.</summary>
-        public const double NeedleSweepDegrees = 96;
+        /// <summary>Shortest a bar ever gets, so the row never disappears.</summary>
+        public const double MinBarLength = 3;
 
-        /// <summary>Needle thickness.</summary>
-        public const double NeedleWidth = 1.5;
+        /// <summary>Bar length at rest, as a fraction of the track.</summary>
+        public const double IdleFraction = 0.16;
 
-        /// <summary>Where 0 VU sits along the scale, 0…1. The red zone begins here.</summary>
-        public const double MeterZeroPoint = 0.72;
+        /// <summary>
+        /// How fast a bar chases the signal, 0…1 per frame.
+        /// </summary>
+        /// <remarks>
+        /// Deliberately not 1. Bars driven straight from the RMS flicker; a little smoothing is
+        /// what makes the row look like a voice rather than noise.
+        /// </remarks>
+        public const double Smoothing = 0.35;
+
+        /// <summary>How fast a bar falls back when the level drops.</summary>
+        public const double Decay = 0.12;
+
+        /// <summary>Speed of the travelling wave that gives the row its motion, in cycles/second.</summary>
+        public const double TravelHz = 1.6;
+
+        /// <summary>How much of a bar's height comes from the travelling wave rather than the level.</summary>
+        public const double TravelDepth = 0.5;
+
+        /// <summary>Input gain. Speech RMS rarely exceeds ~0.3, so it is scaled up to fill the row.</summary>
+        public const double Gain = 3.2;
     }
 
     // ---- Motion ----
 
-    /// <summary>Mechanical, not bouncy. A key travels and stops; it doesn't spring.</summary>
+    /// <summary>Quick and soft. Nothing in a utility should take longer than a glance.</summary>
     public static class Motion
     {
-        /// <summary>Key travel down. Fast enough to feel like contact.</summary>
-        public static TimeSpan Press { get; } = TimeSpan.FromMilliseconds(60);
+        /// <summary>Hover and press feedback.</summary>
+        public static TimeSpan Quick { get; } = TimeSpan.FromMilliseconds(90);
 
-        /// <summary>Key travel up.</summary>
-        public static TimeSpan Release { get; } = TimeSpan.FromMilliseconds(120);
+        /// <summary>The bar changing state or size.</summary>
+        public static TimeSpan State { get; } = TimeSpan.FromMilliseconds(160);
 
-        /// <summary>Panel and view changes.</summary>
-        public static TimeSpan Panel { get; } = TimeSpan.FromMilliseconds(180);
+        /// <summary>Section changes in the hub.</summary>
+        public static TimeSpan Panel { get; } = TimeSpan.FromMilliseconds(200);
 
-        /// <summary>The record lamp coming on — instant, like a filament.</summary>
-        public static TimeSpan Lamp { get; } = TimeSpan.FromMilliseconds(80);
+        /// <summary>Animation frame interval — 60fps.</summary>
+        public static TimeSpan Frame { get; } = TimeSpan.FromMilliseconds(16);
+
+        /// <summary>How often the UI samples engine state. Far below frame rate on purpose.</summary>
+        public static TimeSpan Poll { get; } = TimeSpan.FromMilliseconds(60);
 
         /// <summary>
-        /// VU ballistics: seconds to reach a step going up.
+        /// How long after the last drag movement the bar snaps to an edge.
         /// </summary>
         /// <remarks>
-        /// A real VU movement reaches 99% of a step in ~300 ms and overshoots slightly. That
-        /// lag <i>is</i> the instrument's character — a needle that tracks the signal exactly
-        /// reads as a progress bar with a stick on it.
+        /// A native move-drag takes over the mouse, so there is no pointer-release event to
+        /// hang the snap on. Settling after a pause is what is left.
         /// </remarks>
-        public const double NeedleAttackSeconds = 0.30;
+        public static TimeSpan SnapDelay { get; } = TimeSpan.FromMilliseconds(220);
 
-        /// <summary>Seconds for the needle to fall back.</summary>
-        public const double NeedleReleaseSeconds = 0.42;
-
-        /// <summary>Peak overshoot as a fraction of the step, before settling.</summary>
-        public const double NeedleOvershoot = 0.06;
+        /// <summary>Period of the processing pulse.</summary>
+        public static TimeSpan Pulse { get; } = TimeSpan.FromMilliseconds(900);
     }
 }

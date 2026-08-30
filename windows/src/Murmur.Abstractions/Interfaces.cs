@@ -71,6 +71,43 @@ public interface ITextInjector
     /// <summary>Inserts <paramref name="text"/> at the caret of the focused control.</summary>
     /// <returns>False if the text could not be delivered.</returns>
     ValueTask<bool> InjectAsync(string text, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Presses Enter in the focused application.
+    /// </summary>
+    /// <param name="cancellationToken">Cancels the keystroke.</param>
+    /// <returns>False if the keystroke could not be delivered.</returns>
+    /// <remarks>
+    /// Separate from <see cref="InjectAsync"/> rather than a newline inside the text, because
+    /// the two mean different things. A newline in a chat box is a line break; Enter is send.
+    /// This is what the spoken "press enter" command uses, and nothing else calls it.
+    /// </remarks>
+    ValueTask<bool> PressEnterAsync(CancellationToken cancellationToken);
+}
+
+/// <summary>One microphone the machine can capture from.</summary>
+/// <param name="Id">
+/// An opaque, stable device identifier. Persisted in settings, so it must survive a reboot.
+/// </param>
+/// <param name="Name">What to show the user.</param>
+/// <param name="IsDefault">Whether this is the device capture would pick on its own.</param>
+public readonly record struct AudioDeviceInfo(string Id, string Name, bool IsDefault);
+
+/// <summary>Lists the microphones available for capture.</summary>
+/// <remarks>
+/// Separate from <see cref="IAudioCapture"/> on purpose. Capture is bound to one device for the
+/// life of a recording; enumerating what exists is a question about the machine, asked from the
+/// UI thread while nothing is being recorded. Folding it into the capture interface would mean
+/// every fake capture in the test suite had to answer a question it has no opinion about.
+/// </remarks>
+public interface IAudioDeviceCatalog
+{
+    /// <summary>Every active capture device.</summary>
+    /// <returns>
+    /// The devices, or an empty list when none can be enumerated. Never throws: a machine with
+    /// no microphone is a normal state, not an error.
+    /// </returns>
+    IReadOnlyList<AudioDeviceInfo> List();
 }
 
 /// <summary>Turns audio into text.</summary>

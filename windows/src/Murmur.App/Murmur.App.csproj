@@ -15,6 +15,13 @@
     <AvaloniaResource Include="Assets\**" />
   </ItemGroup>
 
+  <!-- The headless UI tests render the real views, and the shared layout helpers they are
+       built from are internal on purpose — nothing outside the app has any business using
+       them. Opening them to the test assembly is cheaper than making them public. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Murmur.App.Tests" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Avalonia" />
     <PackageReference Include="Avalonia.Desktop" />

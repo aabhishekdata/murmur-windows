@@ -14,35 +14,43 @@ namespace Murmur.App.Views;
 /// </summary>
 /// <remarks>
 /// Both entry kinds live in one list rather than separate tabs — they are two shapes of the
-/// same idea, and you want to see everything you have taught it at once. The kind is carried
-/// by a silkscreen tag on each row.
+/// same idea, and you want to see everything you have taught it at once. The kind is carried by
+/// a chip on each row.
 /// </remarks>
 public sealed class DictionaryView : UserControl
 {
     private readonly DictionaryFile _file;
     private readonly TextBox _search;
     private readonly StackPanel _list;
-    private readonly Silkscreen _count;
+    private readonly Caption _count;
 
     /// <summary>Builds the view over <paramref name="file"/>.</summary>
+    /// <param name="file">The dictionary on disk.</param>
     public DictionaryView(DictionaryFile file)
     {
+        ArgumentNullException.ThrowIfNull(file);
         _file = file;
 
         _search = Panels.SearchBox("Search dictionary");
         _search.TextChanged += (_, _) => Refresh();
 
-        var add = Panels.DeckButton("ADD");
+        var add = Panels.PrimaryButton("Add word");
         add.Click += (_, _) => ShowEditor(null);
 
-        _list = new StackPanel { Spacing = Tokens.Space.Tight, Margin = new Thickness(Tokens.Space.Base) };
-        _count = new Silkscreen { Foreground = new SolidColorBrush(Tokens.Colors.InkOnDeck, 0.5) };
+        _list = new StackPanel
+        {
+            Spacing = Tokens.Space.Tight,
+            Margin = new Thickness(Tokens.Space.Wide, Tokens.Space.Roomy),
+        };
 
-        var reveal = Panels.DeckButton("OPEN DICTIONARY.TXT");
+        _count = new Caption();
+
+        var reveal = Panels.QuietButton("Open dictionary.txt");
         reveal.Click += (_, _) => OpenInEditor(_file.FilePath);
 
         Content = new DockPanel
         {
+            LastChildFill = true,
             Children =
             {
                 Panels.Docked(Panels.SearchRow(_search, add), Dock.Top),
@@ -60,14 +68,14 @@ public sealed class DictionaryView : UserControl
         var entries = _file.Search(_search.Text ?? string.Empty);
 
         _list.Children.Clear();
-        _count.Text = $"{_file.Entries.Count} ENTRIES";
+        _count.Text = _file.Entries.Count == 1 ? "1 entry" : $"{_file.Entries.Count} entries";
 
         if (entries.Count == 0)
         {
             _list.Children.Add(Panels.EmptyState(
-                _file.Entries.Count == 0 ? "DICTIONARY EMPTY" : "NO MATCHES",
+                _file.Entries.Count == 0 ? "Dictionary empty" : "No matches",
                 _file.Entries.Count == 0
-                    ? "Add words it keeps getting wrong."
+                    ? "Add the words it keeps getting wrong, and the spellings you want instead."
                     : "Try a different search."));
             return;
         }
@@ -77,13 +85,14 @@ public sealed class DictionaryView : UserControl
 
     private Border BuildRow(DictionaryEntry entry)
     {
-        var edit = Panels.DeckButton("EDIT");
+        var edit = Panels.QuietButton("Edit");
         edit.Click += (_, _) => ShowEditor(entry);
 
-        var toggle = Panels.DeckButton(entry.IsEnabled ? "OFF" : "ON");
+        var toggle = Panels.QuietButton(entry.IsEnabled ? "Disable" : "Enable");
         toggle.Click += (_, _) => _file.Update(entry with { IsEnabled = !entry.IsEnabled });
 
-        var delete = Panels.DeckButton("DELETE");
+        var delete = Panels.QuietButton("Delete");
+        delete.Tone = ButtonTone.Danger;
         delete.Click += (_, _) => _file.Remove(entry.Id);
 
         var left = new StackPanel
@@ -93,29 +102,17 @@ public sealed class DictionaryView : UserControl
             VerticalAlignment = VerticalAlignment.Center,
             Children =
             {
-                new Lamp
-                {
-                    IsLit = entry.IsEnabled,
-                    LampColor = Tokens.Colors.MeterGreen,
-                    Width = 6,
-                    Height = 6,
-                    VerticalAlignment = VerticalAlignment.Center,
-                },
-                new Silkscreen
-                {
-                    Text = entry.Kind == EntryKind.Correction ? "FIX" : "TERM",
-                    Foreground = new SolidColorBrush(Tokens.Colors.InkOnDeck, 0.5),
-                    Width = 34,
-                    VerticalAlignment = VerticalAlignment.Center,
-                },
+                Panels.Chip(
+                    entry.Kind == EntryKind.Correction ? "Fix" : "Term",
+                    entry.Kind == EntryKind.Correction ? Tokens.Colors.Accent : Tokens.Colors.InkMuted),
                 new TextBlock
                 {
                     Text = entry.Kind == EntryKind.Correction
                         ? $"{entry.Hear}  →  {entry.Write}"
                         : entry.Write,
-                    FontFamily = Tokens.Fonts.Grotesque,
+                    FontFamily = Tokens.Fonts.Ui,
                     FontSize = Tokens.Fonts.Body,
-                    Foreground = Tokens.Brushes.InkOnDeck,
+                    Foreground = Tokens.Brushes.Ink,
                     VerticalAlignment = VerticalAlignment.Center,
                 },
             },
@@ -126,17 +123,26 @@ public sealed class DictionaryView : UserControl
             Orientation = Orientation.Horizontal,
             Spacing = Tokens.Space.Tight,
             HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Center,
+            Opacity = 0,
             Children = { edit, toggle, delete },
         };
 
-        return new Border
+        var row = new Border
         {
-            Background = Tokens.Brushes.Deck,
-            CornerRadius = new CornerRadius(Tokens.Radius.Chip),
+            Background = Tokens.Brushes.Surface,
+            CornerRadius = new CornerRadius(Tokens.Radius.Control),
+            BorderBrush = Tokens.Brushes.Line,
+            BorderThickness = new Thickness(Tokens.Border.Hairline),
             Padding = new Thickness(Tokens.Space.Base, Tokens.Space.Snug),
-            Opacity = entry.IsEnabled ? 1 : 0.45,
+            Opacity = entry.IsEnabled ? 1 : 0.5,
             Child = new Grid { Children = { left, right } },
         };
+
+        row.PointerEntered += (_, _) => right.Opacity = 1;
+        row.PointerExited += (_, _) => right.Opacity = 0;
+
+        return row;
     }
 
     private void ShowEditor(DictionaryEntry? entry)
@@ -182,21 +188,24 @@ public sealed class DictionaryView : UserControl
 /// </summary>
 public sealed class DictionaryEditorWindow : Window
 {
-    private readonly TransportKey _termKey;
-    private readonly TransportKey _correctionKey;
+    private readonly SoftButton _termKey;
+    private readonly SoftButton _correctionKey;
     private readonly TextBox _hear;
     private readonly TextBox _write;
     private readonly StackPanel _warnings;
-    private readonly TransportKey _save;
+    private readonly SoftButton _save;
     private readonly Guid _id;
     private readonly bool _wasEnabled;
 
+    private StackPanel? _hearField;
+    private Caption? _writeLabel;
     private EntryKind _kind;
 
     /// <summary>Raised when the user saves.</summary>
     public event EventHandler<DictionaryEntry>? Saved;
 
     /// <summary>Creates the editor for a new or existing entry.</summary>
+    /// <param name="entry">The entry to edit, or null for a new one.</param>
     public DictionaryEditorWindow(DictionaryEntry? entry)
     {
         _id = entry?.Id ?? Guid.NewGuid();
@@ -207,25 +216,25 @@ public sealed class DictionaryEditorWindow : Window
         Width = 460;
         SizeToContent = SizeToContent.Height;
         CanResize = false;
-        Background = Tokens.Brushes.Chassis;
+        Background = Tokens.Brushes.Canvas;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
 
-        _termKey = new TransportKey { Content = "TERM", EngagedColor = Tokens.Colors.Ink };
-        _correctionKey = new TransportKey { Content = "CORRECTION", EngagedColor = Tokens.Colors.Ink };
+        _termKey = Segment("Term");
+        _correctionKey = Segment("Correction");
         _termKey.Click += (_, _) => SetKind(EntryKind.Term);
         _correctionKey.Click += (_, _) => SetKind(EntryKind.Correction);
 
-        _hear = Field("cloud code", entry?.Hear ?? string.Empty);
-        _write = Field("Claude Code", entry?.Write ?? string.Empty);
+        _hear = Panels.Field("cloud code", entry?.Hear ?? string.Empty);
+        _write = Panels.Field("Claude Code", entry?.Write ?? string.Empty);
         _hear.TextChanged += (_, _) => Revalidate();
         _write.TextChanged += (_, _) => Revalidate();
 
         _warnings = new StackPanel { Spacing = Tokens.Space.Snug };
 
-        var cancel = new TransportKey { Content = "CANCEL" };
+        var cancel = Panels.OutlineButton("Cancel");
         cancel.Click += (_, _) => Close();
 
-        _save = new TransportKey { Content = "SAVE", EngagedColor = Tokens.Colors.Ink };
+        _save = Panels.PrimaryButton("Save");
         _save.Click += (_, _) =>
         {
             if (!IsValid) return;
@@ -236,6 +245,12 @@ public sealed class DictionaryEditorWindow : Window
         Content = BuildContent(cancel);
         SetKind(_kind);
     }
+
+    private static SoftButton Segment(string label) => new()
+    {
+        Content = label,
+        Tone = ButtonTone.Outline,
+    };
 
     private DictionaryEntry Draft => new()
     {
@@ -251,16 +266,15 @@ public sealed class DictionaryEditorWindow : Window
 
     private StackPanel BuildContent(Control cancel)
     {
-        var hearField = Panels.Labelled("WHEN YOU HEAR", _hear);
-        hearField.IsVisible = _kind == EntryKind.Correction;
-        _hearField = hearField;
+        _hearField = Panels.Labelled("When you hear", _hear);
+        _hearField.IsVisible = _kind == EntryKind.Correction;
 
-        _writeLabel = new Silkscreen { Text = "WORD OR PHRASE" };
+        _writeLabel = new Caption { Text = "Word or phrase", IsHeader = true };
 
         return new StackPanel
         {
-            Margin = new Thickness(Tokens.Space.Panel),
-            Spacing = Tokens.Space.Roomy,
+            Margin = new Thickness(Tokens.Space.Section),
+            Spacing = Tokens.Space.Wide,
             Children =
             {
                 new StackPanel
@@ -269,8 +283,8 @@ public sealed class DictionaryEditorWindow : Window
                     Spacing = Tokens.Space.Snug,
                     Children = { _termKey, _correctionKey },
                 },
-                hearField,
-                new StackPanel { Spacing = Tokens.Space.Tight, Children = { _writeLabel, _write } },
+                _hearField,
+                new StackPanel { Spacing = Tokens.Space.Snug, Children = { _writeLabel, _write } },
                 _warnings,
                 new StackPanel
                 {
@@ -283,17 +297,14 @@ public sealed class DictionaryEditorWindow : Window
         };
     }
 
-    private StackPanel? _hearField;
-    private Silkscreen? _writeLabel;
-
     private void SetKind(EntryKind kind)
     {
         _kind = kind;
-        _termKey.IsEngaged = kind == EntryKind.Term;
-        _correctionKey.IsEngaged = kind == EntryKind.Correction;
+        _termKey.IsSelected = kind == EntryKind.Term;
+        _correctionKey.IsSelected = kind == EntryKind.Correction;
 
         if (_hearField is not null) _hearField.IsVisible = kind == EntryKind.Correction;
-        if (_writeLabel is not null) _writeLabel.Text = kind == EntryKind.Correction ? "WRITE" : "WORD OR PHRASE";
+        if (_writeLabel is not null) _writeLabel.Text = kind == EntryKind.Correction ? "Write" : "Word or phrase";
 
         Revalidate();
     }
@@ -304,56 +315,9 @@ public sealed class DictionaryEditorWindow : Window
 
         foreach (var warning in DictionaryWarning.Check(Draft))
         {
-            _warnings.Children.Add(new Border
-            {
-                BorderBrush = new SolidColorBrush(Tokens.Colors.MeterAmber, 0.4),
-                BorderThickness = new Thickness(Tokens.Border.Hairline),
-                CornerRadius = new CornerRadius(Tokens.Radius.Chip),
-                Padding = new Thickness(Tokens.Space.Snug),
-                Child = new StackPanel
-                {
-                    Orientation = Orientation.Horizontal,
-                    Spacing = Tokens.Space.Snug,
-                    Children =
-                    {
-                        new Lamp
-                        {
-                            IsLit = true,
-                            LampColor = Tokens.Colors.MeterAmber,
-                            Width = 6,
-                            Height = 6,
-                            VerticalAlignment = VerticalAlignment.Top,
-                            Margin = new Thickness(0, Tokens.Space.Tight, 0, 0),
-                        },
-                        new TextBlock
-                        {
-                            Text = warning.Message,
-                            FontFamily = Tokens.Fonts.Grotesque,
-                            FontSize = Tokens.Fonts.Label,
-                            Foreground = Tokens.Brushes.Ink,
-                            TextWrapping = TextWrapping.Wrap,
-                            MaxWidth = 340,
-                        },
-                    },
-                },
-            });
+            _warnings.Children.Add(Panels.Notice(warning.Message));
         }
 
-        _save.IsEngaged = IsValid;
         _save.IsEnabled = IsValid;
     }
-
-    private static TextBox Field(string placeholder, string text) => new()
-    {
-        Text = text,
-        Watermark = placeholder,
-        FontFamily = Tokens.Fonts.Grotesque,
-        FontSize = Tokens.Fonts.Body,
-        Foreground = Tokens.Brushes.InkOnDeck,
-        Background = Tokens.Brushes.Deck,
-        BorderBrush = new SolidColorBrush(Tokens.Colors.Seam),
-        BorderThickness = new Thickness(Tokens.Border.Hairline),
-        CornerRadius = new CornerRadius(Tokens.Radius.Chip),
-        Padding = new Thickness(Tokens.Space.Snug),
-    };
 }

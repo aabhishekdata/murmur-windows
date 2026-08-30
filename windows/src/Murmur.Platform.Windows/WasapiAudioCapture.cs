@@ -29,7 +29,7 @@ public sealed class WasapiAudioCapture : IAudioCapture
 {
     private const int BufferMilliseconds = 50;
 
-    private readonly string? _deviceId;
+    private readonly Func<string?> _deviceId;
     private WasapiCapture? _capture;
 
     private Channel<float[]>? _channel;
@@ -40,7 +40,27 @@ public sealed class WasapiAudioCapture : IAudioCapture
 
     /// <summary>Captures from a specific device, or the default when null.</summary>
     /// <param name="deviceId">An <c>MMDevice.ID</c>, or null for the system default.</param>
-    public WasapiAudioCapture(string? deviceId = null) => _deviceId = deviceId;
+    public WasapiAudioCapture(string? deviceId = null) : this(() => deviceId) { }
+
+    /// <summary>
+    /// Captures from whichever device <paramref name="deviceId"/> names at the moment recording
+    /// starts.
+    /// </summary>
+    /// <param name="deviceId">
+    /// Read fresh on every recording rather than captured once, so choosing a different
+    /// microphone in the Hub or on the bar takes effect on the next dictation instead of
+    /// requiring a restart. Returns null for the system default.
+    /// </param>
+    public WasapiAudioCapture(Func<string?> deviceId) => _deviceId = deviceId;
+
+    /// <summary>
+    /// The device recording actually opened, or null when it fell back to the default.
+    /// </summary>
+    /// <remarks>
+    /// Reported rather than assumed: a chosen device can be unplugged between the moment it was
+    /// picked and the moment the key is held.
+    /// </remarks>
+    public string? ActiveDeviceId { get; private set; }
 
     /// <inheritdoc />
     public bool IsCapturing { get; private set; }
@@ -82,11 +102,7 @@ public sealed class WasapiAudioCapture : IAudioCapture
     private void StartCapture()
     {
         using var enumerator = new MMDeviceEnumerator();
-        var device = _deviceId is null
-            // Communications, not Console: this follows the device the user chose as their
-            // default *communication* device, which is what headset users expect.
-            ? enumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications)
-            : enumerator.GetDevice(_deviceId);
+        var device = OpenDevice(enumerator);
 
         // Bounded and drop-oldest so a slow consumer can never block the capture thread.
         // Losing the oldest audio is bad; stalling the audio engine is worse.
@@ -134,6 +150,52 @@ public sealed class WasapiAudioCapture : IAudioCapture
         }
 
         throw new InvalidOperationException("Could not open the microphone in any supported format.");
+    }
+
+    /// <summary>
+    /// Resolves the device to record from.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// An <b>explicitly chosen device always wins</b>, and is looked up by ID rather than by
+    /// role. Windows keeps two separate defaults for capture — Console and Communications — and
+    /// they routinely disagree; this app opens the Communications endpoint when nothing has been
+    /// chosen, because that is the one headset users expect. But once the user has picked a
+    /// microphone by hand, neither default has a say.
+    /// </para>
+    /// <para>
+    /// A chosen device that has since been unplugged falls back to the default rather than
+    /// failing the recording. The alternative is a dictation app that silently stops working
+    /// because a USB microphone was moved to another port, with nothing on screen to explain
+    /// it.
+    /// </para>
+    /// </remarks>
+    private MMDevice OpenDevice(MMDeviceEnumerator enumerator)
+    {
+        var chosen = _deviceId();
+
+        if (!string.IsNullOrEmpty(chosen))
+        {
+            try
+            {
+                var device = enumerator.GetDevice(chosen);
+                if (device.State == DeviceState.Active)
+                {
+                    ActiveDeviceId = device.ID;
+                    return device;
+                }
+
+                device.Dispose();
+            }
+            catch (Exception ex) when (ex is COMException or ArgumentException)
+            {
+                // Unplugged, disabled, or an ID left over from another machine.
+            }
+        }
+
+        var fallback = enumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications);
+        ActiveDeviceId = fallback.ID;
+        return fallback;
     }
 
     /// <summary>Formats to try, best first.</summary>

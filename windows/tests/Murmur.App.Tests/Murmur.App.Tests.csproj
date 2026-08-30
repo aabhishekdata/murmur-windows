@@ -17,9 +17,17 @@
          incompatible package family. -->
     <PackageReference Include="Avalonia.Headless.XUnit" />
     <PackageReference Include="Avalonia.Themes.Fluent" />
+    <!-- Real rasterisation, not the headless no-op drawing backend. This is what makes
+         CaptureRenderedFrame return actual pixels, which is what makes the screenshots in
+         artifacts/ui-preview a genuine review of the UI rather than a picture of nothing.
+         Inter is referenced for the same reason: a headless Linux runner has no system fonts
+         to fall back on, and text would silently render as blanks. -->
+    <PackageReference Include="Avalonia.Skia" />
+    <PackageReference Include="Avalonia.Fonts.Inter" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Murmur.App\Murmur.App.csproj" />
+    <ProjectReference Include="..\..\src\Murmur.Testing\Murmur.Testing.csproj" />
   </ItemGroup>
 </Project>

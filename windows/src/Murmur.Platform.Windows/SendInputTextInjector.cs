@@ -176,6 +176,45 @@ public sealed class SendInputTextInjector : ITextInjector
         return true;
     }
 
+    /// <summary>
+    /// Presses Enter in the focused application.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// What the spoken "press enter" command uses. A real <c>VK_RETURN</c> down/up pair, not a
+    /// Unicode packet for U+000D: many controls treat the two differently, and a chat box that
+    /// inserts a line break when you meant to send is exactly the failure this command exists
+    /// to avoid.
+    /// </para>
+    /// <para>
+    /// Any modifier the user is resting on is lifted first, for the same reason
+    /// <see cref="PressCtrlV"/> does it — Shift+Enter is "new line without sending" in most
+    /// chat applications, so a user with a finger on Shift would get the opposite of what they
+    /// asked for.
+    /// </para>
+    /// </remarks>
+    public ValueTask<bool> PressEnterAsync(CancellationToken cancellationToken)
+    {
+        if (cancellationToken.IsCancellationRequested) return ValueTask.FromResult(false);
+
+        var held = new List<int>();
+        foreach (var key in new[] { VK_SHIFT, VK_CONTROL, VK_MENU, VK_LWIN, VK_RWIN })
+        {
+            if ((GetAsyncKeyState(key) & 0x8000) != 0) held.Add(key);
+        }
+
+        var sequence = new List<INPUT>();
+        foreach (var key in held) sequence.Add(KeyInput(key, up: true));
+
+        sequence.Add(KeyInput(VK_RETURN, up: false));
+        sequence.Add(KeyInput(VK_RETURN, up: true));
+
+        foreach (var key in held) sequence.Add(KeyInput(key, up: false));
+
+        var inputs = sequence.ToArray();
+        return ValueTask.FromResult(SendInput((uint)inputs.Length, inputs, InputSize) == inputs.Length);
+    }
+
     /// <summary>Types text, sending a real Return for each newline.</summary>
     private static bool TypeWithNewlines(string text)
     {

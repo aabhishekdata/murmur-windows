@@ -115,8 +115,16 @@ public static class SelfTest
         var failures = Check("Windows platform assembly loads from the bundle", PlatformFactory.IsAvailable);
         if (!PlatformFactory.IsAvailable) return failures;
 
-        failures += Check("audio capture constructs", PlatformFactory.CreateAudioCapture() is not null);
+        failures += Check("audio capture constructs",
+            PlatformFactory.CreateAudioCapture(static () => null) is not null);
         failures += Check("text injector constructs", PlatformFactory.CreateTextInjector() is not null);
+
+        // Enumeration is what the microphone picker in Settings and on the bar is built on, and
+        // it is reflection-resolved like everything else in the platform layer — so it is worth
+        // proving it loads from the published bundle rather than only from a build output.
+        var microphones = PlatformFactory.CreateAudioDeviceCatalog();
+        failures += Check("microphone catalog constructs", microphones is not null);
+        Console.WriteLine($"  microphones: {microphones?.List().Count ?? 0}");
 
         // Constructed, not started: installing a real low-level keyboard hook on a CI runner
         // is neither useful nor polite.
