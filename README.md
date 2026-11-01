@@ -1,23 +1,73 @@
 # Murmur
 
-Push-to-talk dictation that runs on your own machine by default. Hold a key, talk, release —
-cleaned-up text lands in whatever text field has focus. No account, and out of the box no
-cloud: audio stays on the device.
+Push-to-talk dictation for Windows. Hold a key, talk, let go, and the cleaned-up text lands in
+whatever text field has focus. It transcribes on your PC with Parakeet by default, or with your
+own Azure OpenAI resource if you choose. No installer, no account and no telemetry.
 
-**Privacy, in one paragraph.** On Windows, Parakeet on your PC is the default engine and the
-offline fallback. Cloud transcription is opt-in and uses *your own* Azure OpenAI resource and
-key (`gpt-4o-transcribe` or `gpt-4o-mini-transcribe`); audio leaves the machine only while one
-of the two Azure engine modes is selected, and only to the endpoint you entered. The key is
-encrypted with DPAPI for your Windows account in its own file — it is never written to
-`settings.json`. Speaker labelling (diarization) is not supported. The macOS app has no cloud
-path at all.
+## Download
+
+**[⬇ Download Murmur for Windows (Murmur-win-x64.zip)](https://github.com/aabhishekdata/murmur-windows/releases/latest/download/Murmur-win-x64.zip)**
+
+That link always points to the newest release. Older versions and release notes are on the
+[Releases page](https://github.com/aabhishekdata/murmur-windows/releases). This repository is
+private, so you need to be signed in to GitHub with access to it for the link to work.
+
+1. Unzip **everything** into one folder you can write to, for example `Documents\Murmur`
+   (not `C:\Program Files`). Keep `Murmur.App.exe` and the DLLs together.
+2. Double-click **`Murmur.App.exe`**. SmartScreen warns because the build is unsigned:
+   choose *More info* → *Run anyway*.
+3. Follow the first-run setup: pick an engine, then hold **Right Ctrl** and say hello.
+
+Nothing needs to be installed: .NET is bundled inside the exe.
+
+### Choosing an engine
+
+| Engine | What you need | Where your voice goes |
+|---|---|---|
+| **Offline (Parakeet)**, the default | The Parakeet model (~661 MB). Run `get-model.ps1` from the zip once. | Nowhere. Stays on this PC. |
+| **Azure** | Your own Azure OpenAI resource with a `gpt-4o-transcribe` and/or `gpt-4o-mini-transcribe` deployment, and its key. No model needed. | Only to the Azure endpoint you enter. |
+| **Azure + offline fallback** | Both of the above. | Azure, or this PC when Azure is unreachable. |
+
+For Azure, open **Settings → Transcription**, enter the endpoint, the deployment names
+(*Accurate* = `gpt-4o-transcribe`, *Fast* = `gpt-4o-mini-transcribe`) and the key, then press
+**Test connection**. The default API version is `2025-03-01-preview`; if the test reports
+*not found*, try `2025-04-01-preview`. The tray and bar menus switch between Accurate and Fast
+without a restart.
+
+On a busy or locked-down laptop, Azure mode is the light option: at rest it uses about 95 MB
+of memory and roughly 0.1–0.2 % of one CPU core, because the offline model is never loaded.
+
+### Using it
+
+| Do this | To |
+|---|---|
+| Hold **Right Ctrl**, speak, let go | Dictate into the focused app |
+| **Double-tap** Right Ctrl | Keep listening hands-free; tap once more to stop |
+| **Esc** while dictating | Cancel; nothing is typed |
+| Say a saved prompt's trigger on its own, e.g. *"review prompt"* | Paste that prompt exactly as saved (add *"press enter"* to send it) |
+| Press a prompt's own shortcut | Paste the prompt without speaking |
+| Your paste-last shortcut (set one in Settings) | Paste the last transcript again |
+
+Saved prompts live under **Prompts & snippets**. **History** can paste any transcript again and
+retry the last few with the other engine. **Home** shows words dictated, time saved and an
+estimate of the cloud cost. The badge on the floating bar shows where your voice went: a
+laptop for this PC, a cloud for Azure.
+
+### Privacy
+
+Parakeet on your PC is the default engine and the offline fallback. Audio leaves the machine
+only while an Azure mode is selected, and only to the endpoint you entered. The key is
+encrypted with Windows DPAPI for your account, in its own file. It is never written to
+`settings.json`, the logs or the history. Speaker labelling (diarization) is not supported.
+
+---
 
 This repository holds two implementations:
 
 | | Status |
 |---|---|
-| **[`windows/`](windows/) — the Windows app** | Actively developed. Runs on real hardware; 935 tests green. **Start here.** |
-| `Sources/`, `Tests/` — the macOS app | Upstream code, unchanged. See [The macOS app](#the-macos-app) below. |
+| **[`windows/`](windows/) — the Windows app** | Actively developed. 960 unit tests plus an opt-in end-to-end suite ([docs/TESTING-LOCAL.md](docs/TESTING-LOCAL.md)). **Start here.** |
+| `Sources/`, `Tests/` — the macOS app | Upstream code, unchanged, with no cloud path. See [The macOS app](#the-macos-app) below. |
 
 ---
 
@@ -30,41 +80,29 @@ All macOS code and the shared design remain the original author's.
 
 ---
 
-## Quick start (Windows)
+## Publishing a new download
 
-You need nothing installed to *run* it — the published executable is self-contained.
+Push a version tag and GitHub builds, self-tests and publishes the zip as a release. The
+download link above then points to it automatically:
 
-1. Grab `Murmur-win-x64.zip` from the [Releases](../../releases) page and unzip it to a
-   folder you can write to (not `C:\Program Files`).
-2. Run `get-model.ps1` once to download the Parakeet speech model (~661 MB). Windows has no
-   built-in speech engine this app can use, so it cannot transcribe until the model is on disk.
-3. Run `Murmur.App.exe`. SmartScreen will warn that it's unsigned — *More info* → *Run anyway*.
-4. Hold **Right Ctrl**, speak, release.
+```bash
+git tag v2.0.1
+git push origin v2.0.1
+```
 
-Also worth knowing: **double-tap** Right Ctrl to keep listening hands-free (tap once more to
-stop), **Esc** cancels a dictation and types nothing, and a shortcut you choose in Settings
-(none by default) pastes your last transcript again. History can paste any transcript and retry the last few with the other engine;
-Home shows words, minutes, time saved and an estimate of what the cloud minutes cost. The bar's
-badge says where your voice went — a laptop for this PC, a cloud for your Azure resource.
-
-Optional, and off unless you choose it: to transcribe with your own Azure OpenAI resource
-instead, open **Settings → Transcription engine**, pick *Azure* or *Azure, offline fallback*,
-enter the endpoint, the `gpt-4o-transcribe` (Accurate) and/or `gpt-4o-mini-transcribe` (Fast)
-deployment names and your key, then press **Test connection**. The tray and bar menus switch
-between Accurate and Fast without a restart.
-
-`windows/artifacts/publish/README-FIRST.md` ships alongside the binary with the same steps.
+The [Release workflow](.github/workflows/release.yml) can also be run by hand from the Actions
+tab, which makes a draft release to check before publishing.
 
 ## Building it yourself (Windows)
 
 ```bash
 cd windows
 dotnet build Murmur.sln -c Release          # needs the .NET SDK in global.json
-dotnet test  Murmur.sln -c Release          # 935 tests
+dotnet test  Murmur.sln -c Release          # 960 tests
 dotnet publish src/Murmur.App/Murmur.App.csproj \
   -c Release -r win-x64 --self-contained true \
   -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
-  -o artifacts/publish
+  -p:PublishReadyToRun=true -o artifacts/publish
 ```
 
 Building **on** Windows is the supported path — the MSBuild targets that copy
