@@ -80,9 +80,7 @@ internal static class CrashLog
     {
         try
         {
-            var directory = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "Murmur");
+            var directory = Murmur.Core.MurmurPaths.DataDirectory;
             Directory.CreateDirectory(directory);
             File.AppendAllText(
                 Path.Combine(directory, "last-crash.log"),

@@ -50,7 +50,6 @@ public sealed class SuggestionsView : UserControl
 
         _list = new StackPanel { Spacing = Tokens.Space.Snug };
         Content = _list;
-        Margin = new Thickness(Tokens.Space.Wide, 0, Tokens.Space.Wide, Tokens.Space.Roomy);
 
         // Both stores raise Changed from whichever thread wrote to them, and this rebuilds live
         // controls. Composition marshals, but the view defends itself too — the same discipline
@@ -119,8 +118,8 @@ public sealed class SuggestionsView : UserControl
                     Text = $"{suggestion.Heard}  →  {suggestion.Intended}",
                     FontFamily = Tokens.Fonts.Ui,
                     FontSize = Tokens.Fonts.Body,
-                    Foreground = Tokens.Brushes.Ink,
                     TextWrapping = TextWrapping.Wrap,
+                    [!TextBlock.ForegroundProperty] = Tokens.Live.Ink,
                 },
                 new Caption
                 {
@@ -143,11 +142,11 @@ public sealed class SuggestionsView : UserControl
 
         return new Border
         {
-            Background = Tokens.Brushes.Surface,
-            CornerRadius = new CornerRadius(Tokens.Radius.Control),
-            BorderBrush = new SolidColorBrush(Tokens.Colors.Accent, 0.35),
+            CornerRadius = new CornerRadius(Tokens.Radius.Card),
             BorderThickness = new Thickness(Tokens.Border.Hairline),
             Padding = new Thickness(Tokens.Space.Roomy, Tokens.Space.Base),
+            [!Border.BackgroundProperty] = Tokens.Live.AccentSoft,
+            [!Border.BorderBrushProperty] = Tokens.Live.Line,
             Child = new Grid { Children = { summary, actions } },
         };
     }
@@ -202,8 +201,8 @@ public sealed class TeachCorrectionWindow : Window
         Width = 460;
         SizeToContent = SizeToContent.Height;
         CanResize = false;
-        Background = Tokens.Brushes.Canvas;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        Bind(BackgroundProperty, Tokens.Live.Canvas);
 
         _hear = Panels.Field("what it heard", heard ?? string.Empty);
         _write = Panels.Field("what you meant", string.Empty);

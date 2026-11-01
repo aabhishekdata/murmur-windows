@@ -47,7 +47,7 @@ public static class VoiceCommands
     /// person says as ordinary content, and none of them is worth the risk of an accidental
     /// send.
     /// </remarks>
-    private static readonly string[][] SubmitPhrases =
+    internal static readonly string[][] SubmitPhrases =
     [
         ["press", "enter"],
         ["press", "return"],

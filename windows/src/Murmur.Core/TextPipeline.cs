@@ -41,6 +41,14 @@ public sealed record TextPipelineOptions
 /// <param name="FillersRemoved">How many disfluencies were dropped.</param>
 /// <param name="SelfCorrections">How many spoken retractions were honoured.</param>
 /// <param name="ListStyle">Which list shape, if any, the text was rewritten into.</param>
+/// <param name="WholeSnippet">
+/// The trigger of the saved prompt the whole utterance matched, or null. When set,
+/// <paramref name="Text"/> is that prompt's stored text.
+/// </param>
+/// <param name="Verbatim">
+/// Whether <paramref name="Text"/> must arrive exactly as stored, line breaks and all — true for a
+/// saved prompt, which an injector should paste rather than type.
+/// </param>
 public readonly record struct TextPipelineResult(
     string Text,
     bool Submit,
@@ -48,16 +56,18 @@ public readonly record struct TextPipelineResult(
     IReadOnlyList<AppliedSnippet> Snippets,
     int FillersRemoved,
     int SelfCorrections,
-    ListStyle ListStyle);
+    ListStyle ListStyle,
+    string? WholeSnippet = null,
+    bool Verbatim = false);
 
 /// <summary>
 /// Everything that happens to transcribed text between the recogniser and the keyboard.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Six passes now run over the same string, and the order they run in changes the answer. It is
-/// set here, once, deliberately, rather than emerging from the order somebody happened to add
-/// them to the engine.
+/// Six passes, plus a step that can end the run early, work over the same string, and the order
+/// they run in changes the answer. It is set here, once, deliberately, rather than emerging from
+/// the order somebody happened to add them to the engine.
 /// </para>
 /// <para><b>The order, and why each step is where it is:</b></para>
 /// <list type="number">
@@ -85,6 +95,13 @@ public readonly record struct TextPipelineResult(
 /// "press enter" has to be something the <b>user said</b>. If a stored snippet body happened to
 /// end with those words, expanding first would let stored text press the Enter key — which,
 /// in a chat window, sends a message nobody asked to send.
+/// </item>
+/// <item>
+/// <b>Whole-utterance prompts</b> (4b). After the command, so "review prompt. Press enter."
+/// pastes the prompt and sends it; after the dictionary and retractions for the same reasons
+/// as snippets. On a match the stored prompt replaces the utterance <i>verbatim</i> and the
+/// remaining passes are skipped: a saved prompt is the user's own finished text, and neither a
+/// snippet trigger nor a list marker inside it was said.
 /// </item>
 /// <item>
 /// <b>Snippet expansion.</b> Fifth. By now the trigger is spelled correctly, has survived any
@@ -158,6 +175,25 @@ public static class TextPipeline
             var command = VoiceCommands.Extract(current);
             current = command.Text;
             submit = command.Submit;
+        }
+
+        // 4b. A saved prompt said on its own. Pasted exactly as stored; nothing after this
+        // touches it.
+        if (options.ExpandSnippets && options.Snippets.Count > 0
+            && new WholeUtteranceMatcher(options.Snippets).Match(current, allowSubmitPhrase: options.EnterCommand)
+                is { } prompt)
+        {
+            var trigger = prompt.Snippet.Trigger.Trim();
+            return new TextPipelineResult(
+                prompt.Snippet.Text,
+                submit || prompt.Submit,
+                applied,
+                [new AppliedSnippet(trigger, 1)],
+                fillers,
+                retractions,
+                ListStyle.None,
+                WholeSnippet: trigger,
+                Verbatim: true);
         }
 
         // 5. Snippet expansion.

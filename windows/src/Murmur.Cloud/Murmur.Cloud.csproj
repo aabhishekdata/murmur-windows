@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- Platform-NEUTRAL, like Core. Plain HttpClient and nothing else: no SDK, no Polly. The
+         retry and error mapping are the parts worth testing, and they are small enough to own.
+         CA1416 makes any Windows-only API call here a build error. -->
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Murmur.Cloud</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Murmur.Cloud.Tests" />
+    <!-- Only to turn on plain http to its loopback stand-in for Azure (AzureEndpoint.AllowLoopbackHttp). -->
+    <InternalsVisibleTo Include="Murmur.E2E.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Murmur.Abstractions\Murmur.Abstractions.csproj" />
+  </ItemGroup>
+</Project>

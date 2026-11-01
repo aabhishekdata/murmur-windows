@@ -1,0 +1,3584 @@
+{
+  "version": 2,
+  "cases": [
+    {
+      "name": "dictionary/basic phrase replacement",
+      "pass": "dictionary",
+      "in": "I use cloud code every day.",
+      "out": "I use Claude Code every day.",
+      "dictionary": [
+        {
+          "kind": "correction",
+          "hear": "cloud code",
+          "write": "Claude Code"
+        }
+      ],
+      "corrections": [
+        {
+          "to": "Claude Code",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "dictionary/glued together with no separator",
+      "pass": "dictionary",
+      "in": "I use CloudCode every day.",
+      "out": "I use Claude Code every day.",
+      "dictionary": [
+        {
+          "kind": "correction",
+          "hear": "cloud code",
+          "write": "Claude Code"
+        }
+      ],
+      "corrections": [
+        {
+          "to": "Claude Code",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "dictionary/joined by a hyphen",
+      "pass": "dictionary",
+      "in": "I use Cloud-Code every day.",
+      "out": "I use Claude Code every day.",
+      "dictionary": [
+        {
+          "kind": "correction",
+          "hear": "cloud code",
+          "write": "Claude Code"
+        }
+      ],
+      "corrections": [
+        {
+          "to": "Claude Code",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "dictionary/multiple spaces between parts",
+      "pass": "dictionary",
+      "in": "I use cloud  code every day.",
+      "out": "I use Claude Code every day.",
+      "dictionary": [
+        {
+          "kind": "correction",
+          "hear": "cloud code",
+          "write": "Claude Code"
+        }
+      ],
+      "corrections": [
+        {
+          "to": "Claude Code",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "dictionary/trigger matches regardless of case",
+      "pass": "dictionary",
+      "in": "CLOUD CODE is great.",
+      "out": "Claude Code is great.",
+      "dictionary": [
+        {
+          "kind": "correction",
+          "hear": "cloud code",
+          "write": "Claude Code"
+        }
+      ],
+      "corrections": [
+        {
+          "to": "Claude Code",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "dictionary/must not corrupt a longer word that starts the same way",
+      "pass": "dictionary",
+      "in": "Cloudflare fronts the cloudcodex service.",
+      "out": "Cloudflare fronts the cloudcodex service.",
+      "dictionary": [
+        {
+          "kind": "correction",
+          "hear": "cloud code",
+          "write": "Claude Code"
+        }
+      ],
+      "corrections": []
+    },
+    {
+      "name": "dictionary/must not touch the ordinary word alone",
+      "pass": "dictionary",
+      "in": "The cloud is fine and the code is fine.",
+      "out": "The cloud is fine and the code is fine.",
+      "dictionary": [
+        {
+          "kind": "correction",
+          "hear": "cloud code",
+          "write": "Claude Code"
+        }
+      ],
+      "corrections": []
+    },
+    {
+      "name": "dictionary/longest trigger wins over a shorter overlapping one",
+      "pass": "dictionary",
+      "in": "cloud code",
+      "out": "Claude Code",
+      "dictionary": [
+        {
+          "kind": "correction",
+          "hear": "cloud",
+          "write": "Claude"
+        },
+        {
+          "kind": "correction",
+          "hear": "cloud code",
+          "write": "Claude Code"
+        }
+      ],
+      "corrections": [
+        {
+          "to": "Claude Code",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "dictionary/counts repeated hits",
+      "pass": "dictionary",
+      "in": "clawed code, then clawed code again, and clawed code.",
+      "out": "Claude Code, then Claude Code again, and Claude Code.",
+      "dictionary": [
+        {
+          "kind": "correction",
+          "hear": "clawed code",
+          "write": "Claude Code"
+        }
+      ],
+      "corrections": [
+        {
+          "to": "Claude Code",
+          "count": 3
+        }
+      ]
+    },
+    {
+      "name": "dictionary/punctuation is a boundary",
+      "pass": "dictionary",
+      "in": "(cloud code), \u0022cloud code\u0022; cloud code!",
+      "out": "(Claude Code), \u0022Claude Code\u0022; Claude Code!",
+      "dictionary": [
+        {
+          "kind": "correction",
+          "hear": "cloud code",
+          "write": "Claude Code"
+        }
+      ],
+      "corrections": [
+        {
+          "to": "Claude Code",
+          "count": 3
+        }
+      ]
+    },
+    {
+      "name": "dictionary/a possessive still matches - the apostrophe is not a letter",
+      "pass": "dictionary",
+      "in": "cloud code\u0027s output",
+      "out": "Claude Code\u0027s output",
+      "dictionary": [
+        {
+          "kind": "correction",
+          "hear": "cloud code",
+          "write": "Claude Code"
+        }
+      ],
+      "corrections": [
+        {
+          "to": "Claude Code",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "dictionary/a disabled entry changes nothing",
+      "pass": "dictionary",
+      "in": "I use cloud code every day.",
+      "out": "I use cloud code every day.",
+      "dictionary": [
+        {
+          "kind": "correction",
+          "hear": "cloud code",
+          "write": "Claude Code",
+          "isEnabled": false
+        }
+      ],
+      "corrections": []
+    },
+    {
+      "name": "dictionary/a term entry never rewrites text",
+      "pass": "dictionary",
+      "in": "anthropic makes models.",
+      "out": "anthropic makes models.",
+      "dictionary": [
+        {
+          "kind": "term",
+          "write": "Anthropic"
+        }
+      ],
+      "corrections": []
+    },
+    {
+      "name": "dictionary/single word trigger is honoured when asked for",
+      "pass": "dictionary",
+      "in": "Deployed on Vercell today.",
+      "out": "Deployed on Vercel today.",
+      "dictionary": [
+        {
+          "kind": "correction",
+          "hear": "vercell",
+          "write": "Vercel"
+        }
+      ],
+      "corrections": [
+        {
+          "to": "Vercel",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "dictionary/several independent rules in one pass",
+      "pass": "dictionary",
+      "in": "clawed code beat whisper flow.",
+      "out": "Claude Code beat Wispr Flow.",
+      "dictionary": [
+        {
+          "kind": "correction",
+          "hear": "clawed code",
+          "write": "Claude Code"
+        },
+        {
+          "kind": "correction",
+          "hear": "whisper flow",
+          "write": "Wispr Flow"
+        }
+      ],
+      "corrections": [
+        {
+          "to": "Wispr Flow",
+          "count": 1
+        },
+        {
+          "to": "Claude Code",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "dictionary/empty input is left alone",
+      "pass": "dictionary",
+      "in": "",
+      "out": "",
+      "dictionary": [
+        {
+          "kind": "correction",
+          "hear": "cloud code",
+          "write": "Claude Code"
+        }
+      ],
+      "corrections": []
+    },
+    {
+      "name": "dictionary/replacement containing regex metacharacters is literal",
+      "pass": "dictionary",
+      "in": "I write c plus plus.",
+      "out": "I write C\u002B\u002B.",
+      "dictionary": [
+        {
+          "kind": "correction",
+          "hear": "c plus plus",
+          "write": "C\u002B\u002B"
+        }
+      ],
+      "corrections": [
+        {
+          "to": "C\u002B\u002B",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "dictionary/trigger containing regex metacharacters is literal",
+      "pass": "dictionary",
+      "in": "Built with dot net.",
+      "out": "Built with .NET.",
+      "dictionary": [
+        {
+          "kind": "correction",
+          "hear": "dot net",
+          "write": ".NET"
+        }
+      ],
+      "corrections": [
+        {
+          "to": ".NET",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "dictionary/accented trigger matches decomposed input (NFC normalization)",
+      "pass": "dictionary",
+      "in": "a cafe\u0301 racer bike",
+      "out": "a Caf\u00E9 Racer bike",
+      "dictionary": [
+        {
+          "kind": "correction",
+          "hear": "caf\u00E9 racer",
+          "write": "Caf\u00E9 Racer"
+        }
+      ],
+      "corrections": [
+        {
+          "to": "Caf\u00E9 Racer",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "filler/001",
+      "pass": "filler",
+      "in": "So um I think we should ship it",
+      "out": "So I think we should ship it",
+      "fillersRemoved": 1
+    },
+    {
+      "name": "filler/002",
+      "pass": "filler",
+      "in": "Um so uh I think er we should ship it",
+      "out": "So I think we should ship it",
+      "fillersRemoved": 3
+    },
+    {
+      "name": "filler/003",
+      "pass": "filler",
+      "in": "Well, um, fine.",
+      "out": "Well, fine.",
+      "fillersRemoved": 1
+    },
+    {
+      "name": "filler/004",
+      "pass": "filler",
+      "in": "Um, hello there.",
+      "out": "Hello there.",
+      "fillersRemoved": 1
+    },
+    {
+      "name": "filler/005",
+      "pass": "filler",
+      "in": "Ummm I think uhhh maybe",
+      "out": "I think maybe",
+      "fillersRemoved": 2
+    },
+    {
+      "name": "filler/006",
+      "pass": "filler",
+      "in": "That\u0027s it um.",
+      "out": "That\u0027s it.",
+      "fillersRemoved": 1
+    },
+    {
+      "name": "filler/007",
+      "pass": "filler",
+      "in": "Um, uh, er.",
+      "out": "",
+      "fillersRemoved": 3
+    },
+    {
+      "name": "filler/008",
+      "pass": "filler",
+      "in": "UM I think UH so",
+      "out": "I think so",
+      "fillersRemoved": 2
+    },
+    {
+      "name": "filler/009",
+      "pass": "filler",
+      "in": "Ahmed sent the summary",
+      "out": "Ahmed sent the summary",
+      "fillersRemoved": 0
+    },
+    {
+      "name": "filler/010",
+      "pass": "filler",
+      "in": "The German erratum was hers",
+      "out": "The German erratum was hers",
+      "fillersRemoved": 0
+    },
+    {
+      "name": "filler/011",
+      "pass": "filler",
+      "in": "Her umbrella is under there",
+      "out": "Her umbrella is under there",
+      "fillersRemoved": 0
+    },
+    {
+      "name": "filler/012",
+      "pass": "filler",
+      "in": "He erred on the side of caution",
+      "out": "He erred on the side of caution",
+      "fillersRemoved": 0
+    },
+    {
+      "name": "filler/013",
+      "pass": "filler",
+      "in": "Number the columns",
+      "out": "Number the columns",
+      "fillersRemoved": 0
+    },
+    {
+      "name": "filler/014",
+      "pass": "filler",
+      "in": "The hummus was ahead of its time",
+      "out": "The hummus was ahead of its time",
+      "fillersRemoved": 0
+    },
+    {
+      "name": "filler/015",
+      "pass": "filler",
+      "in": "Mumbai in the summer",
+      "out": "Mumbai in the summer",
+      "fillersRemoved": 0
+    },
+    {
+      "name": "filler/016",
+      "pass": "filler",
+      "in": "ah-ha, that explains it",
+      "out": "ah-ha, that explains it",
+      "fillersRemoved": 0
+    },
+    {
+      "name": "filler/017",
+      "pass": "filler",
+      "in": "uh-huh, go on",
+      "out": "uh-huh, go on",
+      "fillersRemoved": 0
+    },
+    {
+      "name": "filler/018",
+      "pass": "filler",
+      "in": "mm-hmm",
+      "out": "mm-hmm",
+      "fillersRemoved": 0
+    },
+    {
+      "name": "filler/019",
+      "pass": "filler",
+      "in": "huh, that\u0027s odd",
+      "out": "huh, that\u0027s odd",
+      "fillersRemoved": 0
+    },
+    {
+      "name": "filler/020",
+      "pass": "filler",
+      "in": "Oh, I see",
+      "out": "Oh, I see",
+      "fillersRemoved": 0
+    },
+    {
+      "name": "filler/021",
+      "pass": "filler",
+      "in": "Aha, found it",
+      "out": "Aha, found it",
+      "fillersRemoved": 0
+    },
+    {
+      "name": "filler/022",
+      "pass": "filler",
+      "in": "A perfectly ordinary sentence",
+      "out": "A perfectly ordinary sentence",
+      "fillersRemoved": 0
+    },
+    {
+      "name": "filler/023",
+      "pass": "filler",
+      "in": "",
+      "out": "",
+      "fillersRemoved": 0
+    },
+    {
+      "name": "filler/024",
+      "pass": "filler",
+      "in": "   ",
+      "out": "   ",
+      "fillersRemoved": 0
+    },
+    {
+      "name": "filler/025",
+      "pass": "filler",
+      "in": "Werner told Hermann there were errors",
+      "out": "Werner told Hermann there were errors",
+      "fillersRemoved": 0
+    },
+    {
+      "name": "filler/026",
+      "pass": "filler",
+      "in": "The uh-oh moment",
+      "out": "The uh-oh moment",
+      "fillersRemoved": 0
+    },
+    {
+      "name": "filler/027",
+      "pass": "filler",
+      "in": "It was, like, actually fine, you know, basically",
+      "out": "It was, like, actually fine, you know, basically",
+      "fillersRemoved": 0
+    },
+    {
+      "name": "filler/028",
+      "pass": "filler",
+      "in": "hello um there",
+      "out": "hello there",
+      "fillersRemoved": 1
+    },
+    {
+      "name": "self-correction/001",
+      "pass": "selfCorrection",
+      "in": "Let\u0027s meet Tuesday, wait no, Friday.",
+      "out": "Let\u0027s meet Friday.",
+      "selfCorrections": 1
+    },
+    {
+      "name": "self-correction/002",
+      "pass": "selfCorrection",
+      "in": "Let\u0027s meet at three on Tuesday, wait no, at four on Friday.",
+      "out": "Let\u0027s meet at four on Friday.",
+      "selfCorrections": 1
+    },
+    {
+      "name": "self-correction/003",
+      "pass": "selfCorrection",
+      "in": "The deadline is Monday, actually no, Wednesday.",
+      "out": "The deadline is Wednesday.",
+      "selfCorrections": 1
+    },
+    {
+      "name": "self-correction/004",
+      "pass": "selfCorrection",
+      "in": "Send it to Dave, sorry I meant Steve.",
+      "out": "Send it to Steve.",
+      "selfCorrections": 1
+    },
+    {
+      "name": "self-correction/005",
+      "pass": "selfCorrection",
+      "in": "The file is in Documents, I mean Downloads.",
+      "out": "The file is in Downloads.",
+      "selfCorrections": 1
+    },
+    {
+      "name": "self-correction/006",
+      "pass": "selfCorrection",
+      "in": "Let\u0027s meet Tuesday at three. Scratch that, Friday at noon.",
+      "out": "Friday at noon.",
+      "selfCorrections": 1
+    },
+    {
+      "name": "self-correction/007",
+      "pass": "selfCorrection",
+      "in": "Book the room, order the food, and call Dave. Scratch that, cancel it.",
+      "out": "Cancel it.",
+      "selfCorrections": 1
+    },
+    {
+      "name": "self-correction/008",
+      "pass": "selfCorrection",
+      "in": "Meet Tuesday, wait no, Thursday, wait no, Friday.",
+      "out": "Meet Friday.",
+      "selfCorrections": 2
+    },
+    {
+      "name": "self-correction/009",
+      "pass": "selfCorrection",
+      "in": "Tuesday, wait no, Friday.",
+      "out": "Friday.",
+      "selfCorrections": 1
+    },
+    {
+      "name": "self-correction/010",
+      "pass": "selfCorrection",
+      "in": "I can\u0027t wait, no really, it\u0027s fine",
+      "out": "I can\u0027t wait, no really, it\u0027s fine",
+      "selfCorrections": 0
+    },
+    {
+      "name": "self-correction/011",
+      "pass": "selfCorrection",
+      "in": "Please wait. No rush at all.",
+      "out": "Please wait. No rush at all.",
+      "selfCorrections": 0
+    },
+    {
+      "name": "self-correction/012",
+      "pass": "selfCorrection",
+      "in": "I actually agree with you",
+      "out": "I actually agree with you",
+      "selfCorrections": 0
+    },
+    {
+      "name": "self-correction/013",
+      "pass": "selfCorrection",
+      "in": "Actually that\u0027s a good point",
+      "out": "Actually that\u0027s a good point",
+      "selfCorrections": 0
+    },
+    {
+      "name": "self-correction/014",
+      "pass": "selfCorrection",
+      "in": "Well actually no one told me about it",
+      "out": "Well actually no one told me about it",
+      "selfCorrections": 0
+    },
+    {
+      "name": "self-correction/015",
+      "pass": "selfCorrection",
+      "in": "But actually no more excuses",
+      "out": "But actually no more excuses",
+      "selfCorrections": 0
+    },
+    {
+      "name": "self-correction/016",
+      "pass": "selfCorrection",
+      "in": "Do you know what I mean, Dave?",
+      "out": "Do you know what I mean, Dave?",
+      "selfCorrections": 0
+    },
+    {
+      "name": "self-correction/017",
+      "pass": "selfCorrection",
+      "in": "I mean it.",
+      "out": "I mean it.",
+      "selfCorrections": 0
+    },
+    {
+      "name": "self-correction/018",
+      "pass": "selfCorrection",
+      "in": "That is not what I mean.",
+      "out": "That is not what I mean.",
+      "selfCorrections": 0
+    },
+    {
+      "name": "self-correction/019",
+      "pass": "selfCorrection",
+      "in": "You know what I mean by that",
+      "out": "You know what I mean by that",
+      "selfCorrections": 0
+    },
+    {
+      "name": "self-correction/020",
+      "pass": "selfCorrection",
+      "in": "I meant to call you yesterday",
+      "out": "I meant to call you yesterday",
+      "selfCorrections": 0
+    },
+    {
+      "name": "self-correction/021",
+      "pass": "selfCorrection",
+      "in": "That is not what I meant.",
+      "out": "That is not what I meant.",
+      "selfCorrections": 0
+    },
+    {
+      "name": "self-correction/022",
+      "pass": "selfCorrection",
+      "in": "I had to scratch that itch eventually",
+      "out": "I had to scratch that itch eventually",
+      "selfCorrections": 0
+    },
+    {
+      "name": "self-correction/023",
+      "pass": "selfCorrection",
+      "in": "Scratch that one off the list",
+      "out": "Scratch that one off the list",
+      "selfCorrections": 0
+    },
+    {
+      "name": "self-correction/024",
+      "pass": "selfCorrection",
+      "in": "No, seriously, that\u0027s fine",
+      "out": "No, seriously, that\u0027s fine",
+      "selfCorrections": 0
+    },
+    {
+      "name": "self-correction/025",
+      "pass": "selfCorrection",
+      "in": "Everything is fine, I mean",
+      "out": "Everything is fine, I mean",
+      "selfCorrections": 0
+    },
+    {
+      "name": "self-correction/026",
+      "pass": "selfCorrection",
+      "in": "A perfectly ordinary sentence about Tuesday and Friday",
+      "out": "A perfectly ordinary sentence about Tuesday and Friday",
+      "selfCorrections": 0
+    },
+    {
+      "name": "self-correction/027",
+      "pass": "selfCorrection",
+      "in": "",
+      "out": "",
+      "selfCorrections": 0
+    },
+    {
+      "name": "self-correction/028",
+      "pass": "selfCorrection",
+      "in": "   ",
+      "out": "   ",
+      "selfCorrections": 0
+    },
+    {
+      "name": "self-correction/029",
+      "pass": "selfCorrection",
+      "in": "Well, I mean, it depends.",
+      "out": "Well, I mean, it depends.",
+      "selfCorrections": 0
+    },
+    {
+      "name": "self-correction/030",
+      "pass": "selfCorrection",
+      "in": "The plan, I mean, of course, was always Friday",
+      "out": "The plan, I mean, of course, was always Friday",
+      "selfCorrections": 0
+    },
+    {
+      "name": "self-correction/031",
+      "pass": "selfCorrection",
+      "in": "Tuesday, wait no, I have completely changed my mind about the whole thing",
+      "out": "Tuesday, wait no, I have completely changed my mind about the whole thing",
+      "selfCorrections": 0
+    },
+    {
+      "name": "self-correction/032",
+      "pass": "selfCorrection",
+      "in": "I said no, wait for me",
+      "out": "I said no, wait for me",
+      "selfCorrections": 0
+    },
+    {
+      "name": "self-correction/033",
+      "pass": "selfCorrection",
+      "in": "Tuesday, no wait, Friday.",
+      "out": "Tuesday, no wait, Friday.",
+      "selfCorrections": 0
+    },
+    {
+      "name": "self-correction/034",
+      "pass": "selfCorrection",
+      "in": "Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday",
+      "out": "Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday, wait no, Tuesday",
+      "selfCorrections": 4
+    },
+    {
+      "name": "command/001",
+      "pass": "command",
+      "in": "Tell Dave I\u0027ll be ten minutes late. Press enter.",
+      "out": "Tell Dave I\u0027ll be ten minutes late.",
+      "submit": true
+    },
+    {
+      "name": "command/002",
+      "pass": "command",
+      "in": "Send it. Press enter.",
+      "out": "Send it.",
+      "submit": true
+    },
+    {
+      "name": "command/003",
+      "pass": "command",
+      "in": "Send it. Press return.",
+      "out": "Send it.",
+      "submit": true
+    },
+    {
+      "name": "command/004",
+      "pass": "command",
+      "in": "Send it. Hit enter.",
+      "out": "Send it.",
+      "submit": true
+    },
+    {
+      "name": "command/005",
+      "pass": "command",
+      "in": "Send it. Hit return.",
+      "out": "Send it.",
+      "submit": true
+    },
+    {
+      "name": "command/006",
+      "pass": "command",
+      "in": "Press enter.",
+      "out": "",
+      "submit": true
+    },
+    {
+      "name": "command/007",
+      "pass": "command",
+      "in": "Okay. PRESS ENTER!",
+      "out": "Okay.",
+      "submit": true
+    },
+    {
+      "name": "command/008",
+      "pass": "command",
+      "in": "To submit the form, press enter",
+      "out": "To submit the form, press enter",
+      "submit": false
+    },
+    {
+      "name": "command/009",
+      "pass": "command",
+      "in": "Fill in your name and press enter",
+      "out": "Fill in your name and press enter",
+      "submit": false
+    },
+    {
+      "name": "command/010",
+      "pass": "command",
+      "in": "Type your password, then press enter",
+      "out": "Type your password, then press enter",
+      "submit": false
+    },
+    {
+      "name": "command/011",
+      "pass": "command",
+      "in": "The instructions say press enter",
+      "out": "The instructions say press enter",
+      "submit": false
+    },
+    {
+      "name": "command/012",
+      "pass": "command",
+      "in": "Do the thing. And press enter.",
+      "out": "Do the thing. And press enter.",
+      "submit": false
+    },
+    {
+      "name": "command/013",
+      "pass": "command",
+      "in": "Almost done. Then press enter.",
+      "out": "Almost done. Then press enter.",
+      "submit": false
+    },
+    {
+      "name": "command/014",
+      "pass": "command",
+      "in": "One more step. Just press enter.",
+      "out": "One more step. Just press enter.",
+      "submit": false
+    },
+    {
+      "name": "command/015",
+      "pass": "command",
+      "in": "If you\u0027re ready. Please press enter.",
+      "out": "If you\u0027re ready. Please press enter.",
+      "submit": false
+    },
+    {
+      "name": "command/016",
+      "pass": "command",
+      "in": "Press enter to continue reading the document",
+      "out": "Press enter to continue reading the document",
+      "submit": false
+    },
+    {
+      "name": "command/017",
+      "pass": "command",
+      "in": "Press enter, then close the window",
+      "out": "Press enter, then close the window",
+      "submit": false
+    },
+    {
+      "name": "command/018",
+      "pass": "command",
+      "in": "Enter the building through the side door",
+      "out": "Enter the building through the side door",
+      "submit": false
+    },
+    {
+      "name": "command/019",
+      "pass": "command",
+      "in": "Press the button firmly",
+      "out": "Press the button firmly",
+      "submit": false
+    },
+    {
+      "name": "command/020",
+      "pass": "command",
+      "in": "",
+      "out": "",
+      "submit": false
+    },
+    {
+      "name": "command/021",
+      "pass": "command",
+      "in": "   ",
+      "out": "   ",
+      "submit": false
+    },
+    {
+      "name": "command/022",
+      "pass": "command",
+      "in": "Ready. Press, enter.",
+      "out": "Ready. Press, enter.",
+      "submit": false
+    },
+    {
+      "name": "command/023",
+      "pass": "command",
+      "in": "Message Dave about the meeting, press enter",
+      "out": "Message Dave about the meeting, press enter",
+      "submit": false
+    },
+    {
+      "name": "snippet/basic",
+      "pass": "snippet",
+      "in": "Send it to my address please.",
+      "out": "Send it to 12 Bridge Street please.",
+      "snippets": [
+        {
+          "trigger": "my address",
+          "text": "12 Bridge Street"
+        }
+      ],
+      "appliedSnippets": [
+        {
+          "trigger": "my address",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "snippet/multi-line",
+      "pass": "snippet",
+      "in": "my signature",
+      "out": "Best,\nPat",
+      "snippets": [
+        {
+          "trigger": "my signature",
+          "text": "Best,\nPat"
+        }
+      ],
+      "appliedSnippets": [
+        {
+          "trigger": "my signature",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "snippet/longest",
+      "pass": "snippet",
+      "in": "Use my address in full here",
+      "out": "Use LONG here",
+      "snippets": [
+        {
+          "trigger": "my address",
+          "text": "SHORT"
+        },
+        {
+          "trigger": "my address in full",
+          "text": "LONG"
+        }
+      ],
+      "appliedSnippets": [
+        {
+          "trigger": "my address in full",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "snippet/substring-negative",
+      "pass": "snippet",
+      "in": "The design is significant",
+      "out": "The design is significant",
+      "snippets": [
+        {
+          "trigger": "sig",
+          "text": "SIGNATURE"
+        }
+      ],
+      "appliedSnippets": []
+    },
+    {
+      "name": "snippet/fence-negative",
+      "pass": "snippet",
+      "in": "The address bar is fine",
+      "out": "The address bar is fine",
+      "snippets": [
+        {
+          "trigger": "addr",
+          "text": "12 Bridge Street"
+        }
+      ],
+      "appliedSnippets": []
+    },
+    {
+      "name": "snippet/fence-positive",
+      "pass": "snippet",
+      "in": "Type addr here",
+      "out": "Type 12 Bridge Street here",
+      "snippets": [
+        {
+          "trigger": "addr",
+          "text": "12 Bridge Street"
+        }
+      ],
+      "appliedSnippets": [
+        {
+          "trigger": "addr",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "snippet/glued",
+      "pass": "snippet",
+      "in": "standup",
+      "out": "Yesterday: shipped the bar.",
+      "snippets": [
+        {
+          "trigger": "stand up",
+          "text": "Yesterday: shipped the bar."
+        }
+      ],
+      "appliedSnippets": [
+        {
+          "trigger": "stand up",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "snippet/hyphenated",
+      "pass": "snippet",
+      "in": "stand-up",
+      "out": "Yesterday: shipped the bar.",
+      "snippets": [
+        {
+          "trigger": "stand up",
+          "text": "Yesterday: shipped the bar."
+        }
+      ],
+      "appliedSnippets": [
+        {
+          "trigger": "stand up",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "snippet/literal-replacement",
+      "pass": "snippet",
+      "in": "price note",
+      "out": "Costs $1 and $\u0026 more",
+      "snippets": [
+        {
+          "trigger": "price note",
+          "text": "Costs $1 and $\u0026 more"
+        }
+      ],
+      "appliedSnippets": [
+        {
+          "trigger": "price note",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "snippet/disabled",
+      "pass": "snippet",
+      "in": "my address",
+      "out": "my address",
+      "snippets": [
+        {
+          "trigger": "my address",
+          "text": "12 Bridge Street",
+          "isEnabled": false
+        }
+      ],
+      "appliedSnippets": []
+    },
+    {
+      "name": "snippet/short-a",
+      "pass": "snippet",
+      "in": "a",
+      "out": "a",
+      "snippets": [
+        {
+          "trigger": "a",
+          "text": "NOPE"
+        }
+      ],
+      "appliedSnippets": []
+    },
+    {
+      "name": "snippet/short-hi",
+      "pass": "snippet",
+      "in": "hi",
+      "out": "hi",
+      "snippets": [
+        {
+          "trigger": "hi",
+          "text": "NOPE"
+        }
+      ],
+      "appliedSnippets": []
+    },
+    {
+      "name": "snippet/empty-body",
+      "pass": "snippet",
+      "in": "my address",
+      "out": "my address",
+      "snippets": [
+        {
+          "trigger": "my address",
+          "text": ""
+        }
+      ],
+      "appliedSnippets": []
+    },
+    {
+      "name": "snippet/repeated",
+      "pass": "snippet",
+      "in": "my address and my address",
+      "out": "HERE and HERE",
+      "snippets": [
+        {
+          "trigger": "my address",
+          "text": "HERE"
+        }
+      ],
+      "appliedSnippets": [
+        {
+          "trigger": "my address",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "name": "snippet/no-trigger",
+      "pass": "snippet",
+      "in": "An ordinary sentence about somewhere else entirely.",
+      "out": "An ordinary sentence about somewhere else entirely.",
+      "snippets": [
+        {
+          "trigger": "my address",
+          "text": "HERE"
+        }
+      ],
+      "appliedSnippets": []
+    },
+    {
+      "name": "list/001",
+      "pass": "list",
+      "in": "one apples two bananas three oranges",
+      "out": "1. Apples\n2. Bananas\n3. Oranges",
+      "listStyle": "numbered"
+    },
+    {
+      "name": "list/002",
+      "pass": "list",
+      "in": "1. Apples 2. Bananas 3. Oranges",
+      "out": "1. Apples\n2. Bananas\n3. Oranges",
+      "listStyle": "numbered"
+    },
+    {
+      "name": "list/003",
+      "pass": "list",
+      "in": "One, apples. Two, bananas. Three, oranges.",
+      "out": "1. Apples\n2. Bananas\n3. Oranges",
+      "listStyle": "numbered"
+    },
+    {
+      "name": "list/004",
+      "pass": "list",
+      "in": "First, call the bank. Second, email Dave. Third, book the flight.",
+      "out": "1. Call the bank\n2. Email Dave\n3. Book the flight",
+      "listStyle": "numbered"
+    },
+    {
+      "name": "list/005",
+      "pass": "list",
+      "in": "Number one, milk. Number two, eggs.",
+      "out": "1. Milk\n2. Eggs",
+      "listStyle": "numbered"
+    },
+    {
+      "name": "list/006",
+      "pass": "list",
+      "in": "One, milk. Two, eggs.",
+      "out": "1. Milk\n2. Eggs",
+      "listStyle": "numbered"
+    },
+    {
+      "name": "list/007",
+      "pass": "list",
+      "in": "Here\u0027s my shopping list. One, milk. Two, eggs. Three, bread.",
+      "out": "Here\u0027s my shopping list.\n1. Milk\n2. Eggs\n3. Bread",
+      "listStyle": "numbered"
+    },
+    {
+      "name": "list/008",
+      "pass": "list",
+      "in": "One, milk. Two, eggs. Then I went home.",
+      "out": "1. Milk\n2. Eggs\nThen I went home.",
+      "listStyle": "numbered"
+    },
+    {
+      "name": "list/009",
+      "pass": "list",
+      "in": "First, I was scared. Second, I didn\u0027t want to hurt her.",
+      "out": "1. I was scared\n2. I didn\u0027t want to hurt her.",
+      "listStyle": "numbered"
+    },
+    {
+      "name": "list/010",
+      "pass": "list",
+      "in": "1st, milk. 2nd, eggs. 3rd, bread.",
+      "out": "1. Milk\n2. Eggs\n3. Bread",
+      "listStyle": "numbered"
+    },
+    {
+      "name": "list/011",
+      "pass": "list",
+      "in": "One, milk. Two, eggs. Three, bread. Four, butter.",
+      "out": "1. Milk\n2. Eggs\n3. Bread\n4. Butter",
+      "listStyle": "numbered"
+    },
+    {
+      "name": "list/012",
+      "pass": "list",
+      "in": "One, iPhone. Two, iPad.",
+      "out": "1. iPhone\n2. iPad",
+      "listStyle": "numbered"
+    },
+    {
+      "name": "list/013",
+      "pass": "list",
+      "in": "milk, eggs, bread, butter",
+      "out": "- Milk\n- Eggs\n- Bread\n- Butter",
+      "listStyle": "bulleted"
+    },
+    {
+      "name": "list/014",
+      "pass": "list",
+      "in": "milk, eggs, bread, and butter.",
+      "out": "- Milk\n- Eggs\n- Bread\n- Butter",
+      "listStyle": "bulleted"
+    },
+    {
+      "name": "list/015",
+      "pass": "list",
+      "in": "olive oil, whole milk, brown bread",
+      "out": "- Olive oil\n- Whole milk\n- Brown bread",
+      "listStyle": "bulleted"
+    },
+    {
+      "name": "list/016",
+      "pass": "list",
+      "in": "milk, eggs",
+      "out": "milk, eggs",
+      "listStyle": "none"
+    },
+    {
+      "name": "list/017",
+      "pass": "list",
+      "in": "Here\u0027s what I need: milk, eggs, bread",
+      "out": "Here\u0027s what I need:\n- Milk\n- Eggs\n- Bread",
+      "listStyle": "bulleted"
+    },
+    {
+      "name": "list/018",
+      "pass": "list",
+      "in": "Here\u0027s the thing: it was cold, it was dark, it was wet",
+      "out": "Here\u0027s the thing: it was cold, it was dark, it was wet",
+      "listStyle": "none"
+    },
+    {
+      "name": "list/019",
+      "pass": "list",
+      "in": "After a great deal of thought and rather more coffee than was strictly sensible I concluded the following: milk, eggs, bread",
+      "out": "After a great deal of thought and rather more coffee than was strictly sensible I concluded the following: milk, eggs, bread",
+      "listStyle": "none"
+    },
+    {
+      "name": "list/020",
+      "pass": "list",
+      "in": "extra virgin olive oil, large red onions, plain white bread",
+      "out": "- Extra virgin olive oil\n- Large red onions\n- Plain white bread",
+      "listStyle": "bulleted"
+    },
+    {
+      "name": "list/021",
+      "pass": "list",
+      "in": "one two three four five six, a, b",
+      "out": "one two three four five six, a, b",
+      "listStyle": "none"
+    },
+    {
+      "name": "list/022",
+      "pass": "list",
+      "in": "Note: this is the thing: milk, eggs, bread",
+      "out": "Note: this is the thing: milk, eggs, bread",
+      "listStyle": "none"
+    },
+    {
+      "name": "list/023",
+      "pass": "list",
+      "in": "the first time I met her was in Paris",
+      "out": "the first time I met her was in Paris",
+      "listStyle": "none"
+    },
+    {
+      "name": "list/024",
+      "pass": "list",
+      "in": "The first thing I noticed was the second door on the left.",
+      "out": "The first thing I noticed was the second door on the left.",
+      "listStyle": "none"
+    },
+    {
+      "name": "list/025",
+      "pass": "list",
+      "in": "On the one hand it is cheap, on the other hand it is slow",
+      "out": "On the one hand it is cheap, on the other hand it is slow",
+      "listStyle": "none"
+    },
+    {
+      "name": "list/026",
+      "pass": "list",
+      "in": "I only have one question",
+      "out": "I only have one question",
+      "listStyle": "none"
+    },
+    {
+      "name": "list/027",
+      "pass": "list",
+      "in": "He was one of two children.",
+      "out": "He was one of two children.",
+      "listStyle": "none"
+    },
+    {
+      "name": "list/028",
+      "pass": "list",
+      "in": "I need one apple two oranges",
+      "out": "I need one apple two oranges",
+      "listStyle": "none"
+    },
+    {
+      "name": "list/029",
+      "pass": "list",
+      "in": "Pick one or two and let me know",
+      "out": "Pick one or two and let me know",
+      "listStyle": "none"
+    },
+    {
+      "name": "list/030",
+      "pass": "list",
+      "in": "two coffees please",
+      "out": "two coffees please",
+      "listStyle": "none"
+    },
+    {
+      "name": "list/031",
+      "pass": "list",
+      "in": "There were two options; one was cheaper.",
+      "out": "There were two options; one was cheaper.",
+      "listStyle": "none"
+    },
+    {
+      "name": "list/032",
+      "pass": "list",
+      "in": "one two three",
+      "out": "one two three",
+      "listStyle": "none"
+    },
+    {
+      "name": "list/033",
+      "pass": "list",
+      "in": "First of all, thanks for coming. Second of all, sorry I\u0027m late.",
+      "out": "First of all, thanks for coming. Second of all, sorry I\u0027m late.",
+      "listStyle": "none"
+    },
+    {
+      "name": "list/034",
+      "pass": "list",
+      "in": "It was cold, dark, and wet.",
+      "out": "It was cold, dark, and wet.",
+      "listStyle": "none"
+    },
+    {
+      "name": "list/035",
+      "pass": "list",
+      "in": "I went to the store, bought some milk, and came home.",
+      "out": "I went to the store, bought some milk, and came home.",
+      "listStyle": "none"
+    },
+    {
+      "name": "list/036",
+      "pass": "list",
+      "in": "Yeah, sure, okay.",
+      "out": "Yeah, sure, okay.",
+      "listStyle": "none"
+    },
+    {
+      "name": "list/037",
+      "pass": "list",
+      "in": "Hi John, how are you doing today?",
+      "out": "Hi John, how are you doing today?",
+      "listStyle": "none"
+    },
+    {
+      "name": "list/038",
+      "pass": "list",
+      "in": "",
+      "out": "",
+      "listStyle": "none"
+    },
+    {
+      "name": "list/039",
+      "pass": "list",
+      "in": "   ",
+      "out": "   ",
+      "listStyle": "none"
+    },
+    {
+      "name": "list/040",
+      "pass": "list",
+      "in": "Just a normal sentence with no numbers in it at all.",
+      "out": "Just a normal sentence with no numbers in it at all.",
+      "listStyle": "none"
+    },
+    {
+      "name": "list/041",
+      "pass": "list",
+      "in": "One, I went to the shop and it was closed and then it started raining hard. Two, eggs.",
+      "out": "One, I went to the shop and it was closed and then it started raining hard. Two, eggs.",
+      "listStyle": "none"
+    },
+    {
+      "name": "list/042",
+      "pass": "list",
+      "in": "1. Apples\n2. Bananas",
+      "out": "1. Apples\n2. Bananas",
+      "listStyle": "none"
+    },
+    {
+      "name": "list/043",
+      "pass": "list",
+      "in": "One, milk. Three, bread.",
+      "out": "One, milk. Three, bread.",
+      "listStyle": "none"
+    },
+    {
+      "name": "list/044",
+      "pass": "list",
+      "in": "Two, bananas. One, apples.",
+      "out": "Two, bananas. One, apples.",
+      "listStyle": "none"
+    },
+    {
+      "name": "list/045",
+      "pass": "list",
+      "in": "One, milk. Second, eggs.",
+      "out": "One, milk. Second, eggs.",
+      "listStyle": "none"
+    },
+    {
+      "name": "list/046",
+      "pass": "list",
+      "in": "Fifty, sixty, seventy",
+      "out": "Fifty, sixty, seventy",
+      "listStyle": "none"
+    },
+    {
+      "name": "pipeline/order-fillers-dictionary",
+      "pass": "pipeline",
+      "in": "I use cloud um code every day",
+      "out": "I use Claude Code every day",
+      "submit": false,
+      "dictionary": [
+        {
+          "kind": "correction",
+          "hear": "cloud code",
+          "write": "Claude Code"
+        }
+      ],
+      "snippets": [],
+      "options": {},
+      "fillersRemoved": 1,
+      "selfCorrections": 0,
+      "listStyle": "none",
+      "corrections": [
+        {
+          "to": "Claude Code",
+          "count": 1
+        }
+      ],
+      "appliedSnippets": []
+    },
+    {
+      "name": "pipeline/punctuated-filler-limit",
+      "pass": "pipeline",
+      "in": "I use cloud, um, code every day",
+      "out": "I use cloud, code every day",
+      "submit": false,
+      "dictionary": [
+        {
+          "kind": "correction",
+          "hear": "cloud code",
+          "write": "Claude Code"
+        }
+      ],
+      "snippets": [],
+      "options": {},
+      "fillersRemoved": 1,
+      "selfCorrections": 0,
+      "listStyle": "none",
+      "corrections": [],
+      "appliedSnippets": []
+    },
+    {
+      "name": "pipeline/order-dictionary-self",
+      "pass": "pipeline",
+      "in": "Meet Tuesday, weight no, Friday.",
+      "out": "Meet Friday.",
+      "submit": false,
+      "dictionary": [
+        {
+          "kind": "correction",
+          "hear": "weight no",
+          "write": "wait no"
+        }
+      ],
+      "snippets": [],
+      "options": {},
+      "fillersRemoved": 0,
+      "selfCorrections": 1,
+      "listStyle": "none",
+      "corrections": [
+        {
+          "to": "wait no",
+          "count": 1
+        }
+      ],
+      "appliedSnippets": []
+    },
+    {
+      "name": "pipeline/symmetric-bound",
+      "pass": "pipeline",
+      "in": "Send it to Claude Code, wait no, Vercel.",
+      "out": "Send it to Claude Vercel.",
+      "submit": false,
+      "dictionary": [],
+      "snippets": [],
+      "options": {},
+      "fillersRemoved": 0,
+      "selfCorrections": 1,
+      "listStyle": "none",
+      "corrections": [],
+      "appliedSnippets": []
+    },
+    {
+      "name": "pipeline/order-self-snippet",
+      "pass": "pipeline",
+      "in": "Use my address, wait no, my signature.",
+      "out": "Use Best, Pat.",
+      "submit": false,
+      "dictionary": [],
+      "snippets": [
+        {
+          "trigger": "my address",
+          "text": "12 Bridge Street"
+        },
+        {
+          "trigger": "my signature",
+          "text": "Best, Pat"
+        }
+      ],
+      "options": {},
+      "fillersRemoved": 0,
+      "selfCorrections": 1,
+      "listStyle": "none",
+      "corrections": [],
+      "appliedSnippets": [
+        {
+          "trigger": "my signature",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "pipeline/order-command-snippet",
+      "pass": "pipeline",
+      "in": "Use my sign off",
+      "out": "Use Kind regards. Press enter.",
+      "submit": false,
+      "dictionary": [],
+      "snippets": [
+        {
+          "trigger": "my sign off",
+          "text": "Kind regards. Press enter."
+        }
+      ],
+      "options": {},
+      "fillersRemoved": 0,
+      "selfCorrections": 0,
+      "listStyle": "none",
+      "corrections": [],
+      "appliedSnippets": [
+        {
+          "trigger": "my sign off",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "pipeline/command-with-snippet",
+      "pass": "pipeline",
+      "in": "Use my sign off. Press enter.",
+      "out": "Use Kind regards.",
+      "submit": true,
+      "dictionary": [],
+      "snippets": [
+        {
+          "trigger": "my sign off",
+          "text": "Kind regards"
+        }
+      ],
+      "options": {},
+      "fillersRemoved": 0,
+      "selfCorrections": 0,
+      "listStyle": "none",
+      "corrections": [],
+      "appliedSnippets": [
+        {
+          "trigger": "my sign off",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "pipeline/order-list-last",
+      "pass": "pipeline",
+      "in": "Um, one apples, two bananas, three oranges.",
+      "out": "1. Apples\n2. Bananas\n3. Oranges",
+      "submit": false,
+      "dictionary": [],
+      "snippets": [],
+      "options": {},
+      "fillersRemoved": 1,
+      "selfCorrections": 0,
+      "listStyle": "numbered",
+      "corrections": [],
+      "appliedSnippets": []
+    },
+    {
+      "name": "pipeline/multi-line-snippet",
+      "pass": "pipeline",
+      "in": "one my signature two bananas",
+      "out": "one Best,\nPat two bananas",
+      "submit": false,
+      "dictionary": [],
+      "snippets": [
+        {
+          "trigger": "my signature",
+          "text": "Best,\nPat"
+        }
+      ],
+      "options": {},
+      "fillersRemoved": 0,
+      "selfCorrections": 0,
+      "listStyle": "none",
+      "corrections": [],
+      "appliedSnippets": [
+        {
+          "trigger": "my signature",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "pipeline/everything",
+      "pass": "pipeline",
+      "in": "Um, email steev, wait no, Dave, using my sign off. Press enter.",
+      "out": "Email Dave, using Kind regards.",
+      "submit": true,
+      "dictionary": [
+        {
+          "kind": "correction",
+          "hear": "steev",
+          "write": "Steve"
+        }
+      ],
+      "snippets": [
+        {
+          "trigger": "my sign off",
+          "text": "Kind regards"
+        }
+      ],
+      "options": {},
+      "fillersRemoved": 1,
+      "selfCorrections": 1,
+      "listStyle": "none",
+      "corrections": [
+        {
+          "to": "Steve",
+          "count": 1
+        }
+      ],
+      "appliedSnippets": [
+        {
+          "trigger": "my sign off",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "pipeline/toggle-fillers",
+      "pass": "pipeline",
+      "in": "Um, one apples two bananas. Press enter.",
+      "out": "Um,\n1. Apples\n2. Bananas",
+      "submit": true,
+      "dictionary": [],
+      "snippets": [],
+      "options": {
+        "removeFillers": false
+      },
+      "fillersRemoved": 0,
+      "selfCorrections": 0,
+      "listStyle": "numbered",
+      "corrections": [],
+      "appliedSnippets": []
+    },
+    {
+      "name": "pipeline/toggle-lists",
+      "pass": "pipeline",
+      "in": "Um, one apples two bananas. Press enter.",
+      "out": "One apples two bananas.",
+      "submit": true,
+      "dictionary": [],
+      "snippets": [],
+      "options": {
+        "formatLists": false
+      },
+      "fillersRemoved": 1,
+      "selfCorrections": 0,
+      "listStyle": "none",
+      "corrections": [],
+      "appliedSnippets": []
+    },
+    {
+      "name": "pipeline/toggle-command",
+      "pass": "pipeline",
+      "in": "Um, one apples two bananas. Press enter.",
+      "out": "1. Apples\n2. Bananas\nPress enter.",
+      "submit": false,
+      "dictionary": [],
+      "snippets": [],
+      "options": {
+        "enterCommand": false
+      },
+      "fillersRemoved": 1,
+      "selfCorrections": 0,
+      "listStyle": "numbered",
+      "corrections": [],
+      "appliedSnippets": []
+    },
+    {
+      "name": "pipeline/toggle-self",
+      "pass": "pipeline",
+      "in": "Meet Tuesday, wait no, Friday.",
+      "out": "Meet Tuesday, wait no, Friday.",
+      "submit": false,
+      "dictionary": [],
+      "snippets": [],
+      "options": {
+        "applySelfCorrections": false
+      },
+      "fillersRemoved": 0,
+      "selfCorrections": 0,
+      "listStyle": "none",
+      "corrections": [],
+      "appliedSnippets": []
+    },
+    {
+      "name": "pipeline/toggle-snippets",
+      "pass": "pipeline",
+      "in": "Use my address.",
+      "out": "Use my address.",
+      "submit": false,
+      "dictionary": [],
+      "snippets": [
+        {
+          "trigger": "my address",
+          "text": "12 Bridge Street"
+        }
+      ],
+      "options": {
+        "expandSnippets": false
+      },
+      "fillersRemoved": 0,
+      "selfCorrections": 0,
+      "listStyle": "none",
+      "corrections": [],
+      "appliedSnippets": []
+    },
+    {
+      "name": "pipeline/dictionary-always",
+      "pass": "pipeline",
+      "in": "cloud code",
+      "out": "Claude Code",
+      "submit": false,
+      "dictionary": [
+        {
+          "kind": "correction",
+          "hear": "cloud code",
+          "write": "Claude Code"
+        }
+      ],
+      "snippets": [],
+      "options": {
+        "removeFillers": false,
+        "applySelfCorrections": false,
+        "enterCommand": false,
+        "expandSnippets": false,
+        "formatLists": false
+      },
+      "fillersRemoved": 0,
+      "selfCorrections": 0,
+      "listStyle": "none",
+      "corrections": [
+        {
+          "to": "Claude Code",
+          "count": 1
+        }
+      ],
+      "appliedSnippets": []
+    },
+    {
+      "name": "pipeline/negative-181",
+      "pass": "pipeline",
+      "in": "The first time I met her was in Paris, and I only have one question about it.",
+      "out": "The first time I met her was in Paris, and I only have one question about it.",
+      "submit": false,
+      "dictionary": [],
+      "snippets": [],
+      "options": {},
+      "fillersRemoved": 0,
+      "selfCorrections": 0,
+      "listStyle": "none",
+      "corrections": [],
+      "appliedSnippets": []
+    },
+    {
+      "name": "pipeline/negative-182",
+      "pass": "pipeline",
+      "in": "I actually agree, and I meant to call you about the umbrella.",
+      "out": "I actually agree, and I meant to call you about the umbrella.",
+      "submit": false,
+      "dictionary": [],
+      "snippets": [],
+      "options": {},
+      "fillersRemoved": 0,
+      "selfCorrections": 0,
+      "listStyle": "none",
+      "corrections": [],
+      "appliedSnippets": []
+    },
+    {
+      "name": "pipeline/negative-183",
+      "pass": "pipeline",
+      "in": "Ahmed said there were errors in the German summary.",
+      "out": "Ahmed said there were errors in the German summary.",
+      "submit": false,
+      "dictionary": [],
+      "snippets": [],
+      "options": {},
+      "fillersRemoved": 0,
+      "selfCorrections": 0,
+      "listStyle": "none",
+      "corrections": [],
+      "appliedSnippets": []
+    },
+    {
+      "name": "pipeline/negative-184",
+      "pass": "pipeline",
+      "in": "To submit the form, press enter, then wait for the confirmation.",
+      "out": "To submit the form, press enter, then wait for the confirmation.",
+      "submit": false,
+      "dictionary": [],
+      "snippets": [],
+      "options": {},
+      "fillersRemoved": 0,
+      "selfCorrections": 0,
+      "listStyle": "none",
+      "corrections": [],
+      "appliedSnippets": []
+    },
+    {
+      "name": "pipeline/negative-185",
+      "pass": "pipeline",
+      "in": "He was one of two children, which is not what I mean by a large family.",
+      "out": "He was one of two children, which is not what I mean by a large family.",
+      "submit": false,
+      "dictionary": [],
+      "snippets": [],
+      "options": {},
+      "fillersRemoved": 0,
+      "selfCorrections": 0,
+      "listStyle": "none",
+      "corrections": [],
+      "appliedSnippets": []
+    },
+    {
+      "name": "pipeline/negative-186",
+      "pass": "pipeline",
+      "in": "It was cold, dark, and wet, so we went home.",
+      "out": "It was cold, dark, and wet, so we went home.",
+      "submit": false,
+      "dictionary": [],
+      "snippets": [],
+      "options": {},
+      "fillersRemoved": 0,
+      "selfCorrections": 0,
+      "listStyle": "none",
+      "corrections": [],
+      "appliedSnippets": []
+    },
+    {
+      "name": "pipeline/negative-187",
+      "pass": "pipeline",
+      "in": "Please wait. No rush at all.",
+      "out": "Please wait. No rush at all.",
+      "submit": false,
+      "dictionary": [],
+      "snippets": [],
+      "options": {},
+      "fillersRemoved": 0,
+      "selfCorrections": 0,
+      "listStyle": "none",
+      "corrections": [],
+      "appliedSnippets": []
+    },
+    {
+      "name": "pipeline/negative-188",
+      "pass": "pipeline",
+      "in": "I had to scratch that itch, and honestly I can\u0027t wait, no really.",
+      "out": "I had to scratch that itch, and honestly I can\u0027t wait, no really.",
+      "submit": false,
+      "dictionary": [],
+      "snippets": [],
+      "options": {},
+      "fillersRemoved": 0,
+      "selfCorrections": 0,
+      "listStyle": "none",
+      "corrections": [],
+      "appliedSnippets": []
+    },
+    {
+      "name": "pipeline/negative-189",
+      "pass": "pipeline",
+      "in": "Um, uh, er.",
+      "out": "",
+      "submit": false,
+      "dictionary": [],
+      "snippets": [],
+      "options": {},
+      "fillersRemoved": 3,
+      "selfCorrections": 0,
+      "listStyle": "none",
+      "corrections": [],
+      "appliedSnippets": []
+    },
+    {
+      "name": "pipeline/negative-190",
+      "pass": "pipeline",
+      "in": "Press enter.",
+      "out": "",
+      "submit": true,
+      "dictionary": [],
+      "snippets": [],
+      "options": {},
+      "fillersRemoved": 0,
+      "selfCorrections": 0,
+      "listStyle": "none",
+      "corrections": [],
+      "appliedSnippets": []
+    },
+    {
+      "name": "pipeline/negative-191",
+      "pass": "pipeline",
+      "in": "",
+      "out": "",
+      "submit": false,
+      "dictionary": [],
+      "snippets": [],
+      "options": {},
+      "fillersRemoved": 0,
+      "selfCorrections": 0,
+      "listStyle": "none",
+      "corrections": [],
+      "appliedSnippets": []
+    },
+    {
+      "name": "pipeline/negative-192",
+      "pass": "pipeline",
+      "in": "   ",
+      "out": "   ",
+      "submit": false,
+      "dictionary": [],
+      "snippets": [],
+      "options": {},
+      "fillersRemoved": 0,
+      "selfCorrections": 0,
+      "listStyle": "none",
+      "corrections": [],
+      "appliedSnippets": []
+    },
+    {
+      "name": "snippet/whole-utterance-excluded",
+      "pass": "snippet",
+      "in": "Please use review prompt here",
+      "out": "Please use review prompt here",
+      "snippets": [
+        {
+          "trigger": "review prompt",
+          "text": "NOPE",
+          "match": "wholeUtterance"
+        }
+      ],
+      "appliedSnippets": []
+    },
+    {
+      "name": "snippet/whole-utterance-excluded-alone",
+      "pass": "snippet",
+      "in": "review prompt",
+      "out": "review prompt",
+      "snippets": [
+        {
+          "trigger": "review prompt",
+          "text": "NOPE",
+          "match": "wholeUtterance"
+        }
+      ],
+      "appliedSnippets": []
+    },
+    {
+      "name": "pipeline/whole-match",
+      "pass": "pipeline",
+      "in": "Review prompt.",
+      "out": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+      "submit": false,
+      "dictionary": [],
+      "snippets": [
+        {
+          "trigger": "review prompt",
+          "text": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+          "match": "wholeUtterance"
+        }
+      ],
+      "options": {},
+      "fillersRemoved": 0,
+      "selfCorrections": 0,
+      "listStyle": "none",
+      "corrections": [],
+      "appliedSnippets": [
+        {
+          "trigger": "review prompt",
+          "count": 1
+        }
+      ],
+      "wholeSnippet": "review prompt",
+      "verbatim": true
+    },
+    {
+      "name": "pipeline/whole-after-fillers",
+      "pass": "pipeline",
+      "in": "Um, review, uh, prompt.",
+      "out": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+      "submit": false,
+      "dictionary": [],
+      "snippets": [
+        {
+          "trigger": "review prompt",
+          "text": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+          "match": "wholeUtterance"
+        }
+      ],
+      "options": {},
+      "fillersRemoved": 2,
+      "selfCorrections": 0,
+      "listStyle": "none",
+      "corrections": [],
+      "appliedSnippets": [
+        {
+          "trigger": "review prompt",
+          "count": 1
+        }
+      ],
+      "wholeSnippet": "review prompt",
+      "verbatim": true
+    },
+    {
+      "name": "pipeline/whole-after-retraction",
+      "pass": "pipeline",
+      "in": "My address, wait no, review prompt.",
+      "out": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+      "submit": false,
+      "dictionary": [],
+      "snippets": [
+        {
+          "trigger": "review prompt",
+          "text": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "my address",
+          "text": "12 Bridge Street"
+        }
+      ],
+      "options": {},
+      "fillersRemoved": 0,
+      "selfCorrections": 1,
+      "listStyle": "none",
+      "corrections": [],
+      "appliedSnippets": [
+        {
+          "trigger": "review prompt",
+          "count": 1
+        }
+      ],
+      "wholeSnippet": "review prompt",
+      "verbatim": true
+    },
+    {
+      "name": "pipeline/whole-after-dictionary",
+      "pass": "pipeline",
+      "in": "Review prom.",
+      "out": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+      "submit": false,
+      "dictionary": [
+        {
+          "kind": "correction",
+          "hear": "prom",
+          "write": "prompt"
+        }
+      ],
+      "snippets": [
+        {
+          "trigger": "review prompt",
+          "text": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+          "match": "wholeUtterance"
+        }
+      ],
+      "options": {},
+      "fillersRemoved": 0,
+      "selfCorrections": 0,
+      "listStyle": "none",
+      "corrections": [
+        {
+          "to": "prompt",
+          "count": 1
+        }
+      ],
+      "appliedSnippets": [
+        {
+          "trigger": "review prompt",
+          "count": 1
+        }
+      ],
+      "wholeSnippet": "review prompt",
+      "verbatim": true
+    },
+    {
+      "name": "pipeline/whole-no-match",
+      "pass": "pipeline",
+      "in": "Please review prompt.",
+      "out": "Please review prompt.",
+      "submit": false,
+      "dictionary": [],
+      "snippets": [
+        {
+          "trigger": "review prompt",
+          "text": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+          "match": "wholeUtterance"
+        }
+      ],
+      "options": {},
+      "fillersRemoved": 0,
+      "selfCorrections": 0,
+      "listStyle": "none",
+      "corrections": [],
+      "appliedSnippets": []
+    },
+    {
+      "name": "pipeline/whole-press-enter",
+      "pass": "pipeline",
+      "in": "Review prompt. Press enter.",
+      "out": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+      "submit": true,
+      "dictionary": [],
+      "snippets": [
+        {
+          "trigger": "review prompt",
+          "text": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+          "match": "wholeUtterance"
+        }
+      ],
+      "options": {},
+      "fillersRemoved": 0,
+      "selfCorrections": 0,
+      "listStyle": "none",
+      "corrections": [],
+      "appliedSnippets": [
+        {
+          "trigger": "review prompt",
+          "count": 1
+        }
+      ],
+      "wholeSnippet": "review prompt",
+      "verbatim": true
+    },
+    {
+      "name": "pipeline/whole-press-enter-unpunctuated",
+      "pass": "pipeline",
+      "in": "review prompt press enter",
+      "out": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+      "submit": true,
+      "dictionary": [],
+      "snippets": [
+        {
+          "trigger": "review prompt",
+          "text": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+          "match": "wholeUtterance"
+        }
+      ],
+      "options": {},
+      "fillersRemoved": 0,
+      "selfCorrections": 0,
+      "listStyle": "none",
+      "corrections": [],
+      "appliedSnippets": [
+        {
+          "trigger": "review prompt",
+          "count": 1
+        }
+      ],
+      "wholeSnippet": "review prompt",
+      "verbatim": true
+    },
+    {
+      "name": "pipeline/whole-press-enter-command-off",
+      "pass": "pipeline",
+      "in": "review prompt press enter",
+      "out": "review prompt press enter",
+      "submit": false,
+      "dictionary": [],
+      "snippets": [
+        {
+          "trigger": "review prompt",
+          "text": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+          "match": "wholeUtterance"
+        }
+      ],
+      "options": {
+        "enterCommand": false
+      },
+      "fillersRemoved": 0,
+      "selfCorrections": 0,
+      "listStyle": "none",
+      "corrections": [],
+      "appliedSnippets": []
+    },
+    {
+      "name": "pipeline/whole-body-untouched",
+      "pass": "pipeline",
+      "in": "review prompt",
+      "out": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+      "submit": false,
+      "dictionary": [
+        {
+          "kind": "correction",
+          "hear": "cloud code",
+          "write": "Claude Code"
+        }
+      ],
+      "snippets": [
+        {
+          "trigger": "review prompt",
+          "text": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "bananas",
+          "text": "INLINE"
+        }
+      ],
+      "options": {},
+      "fillersRemoved": 0,
+      "selfCorrections": 0,
+      "listStyle": "none",
+      "corrections": [],
+      "appliedSnippets": [
+        {
+          "trigger": "review prompt",
+          "count": 1
+        }
+      ],
+      "wholeSnippet": "review prompt",
+      "verbatim": true
+    },
+    {
+      "name": "pipeline/whole-body-not-a-command",
+      "pass": "pipeline",
+      "in": "send prompt",
+      "out": "Ship it. Press enter.",
+      "submit": false,
+      "dictionary": [],
+      "snippets": [
+        {
+          "trigger": "send prompt",
+          "text": "Ship it. Press enter.",
+          "match": "wholeUtterance"
+        }
+      ],
+      "options": {},
+      "fillersRemoved": 0,
+      "selfCorrections": 0,
+      "listStyle": "none",
+      "corrections": [],
+      "appliedSnippets": [
+        {
+          "trigger": "send prompt",
+          "count": 1
+        }
+      ],
+      "wholeSnippet": "send prompt",
+      "verbatim": true
+    },
+    {
+      "name": "pipeline/whole-disabled",
+      "pass": "pipeline",
+      "in": "review prompt",
+      "out": "review prompt",
+      "submit": false,
+      "dictionary": [],
+      "snippets": [
+        {
+          "trigger": "review prompt",
+          "text": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+          "isEnabled": false,
+          "match": "wholeUtterance"
+        }
+      ],
+      "options": {},
+      "fillersRemoved": 0,
+      "selfCorrections": 0,
+      "listStyle": "none",
+      "corrections": [],
+      "appliedSnippets": []
+    },
+    {
+      "name": "pipeline/whole-snippets-off",
+      "pass": "pipeline",
+      "in": "review prompt",
+      "out": "review prompt",
+      "submit": false,
+      "dictionary": [],
+      "snippets": [
+        {
+          "trigger": "review prompt",
+          "text": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+          "match": "wholeUtterance"
+        }
+      ],
+      "options": {
+        "expandSnippets": false
+      },
+      "fillersRemoved": 0,
+      "selfCorrections": 0,
+      "listStyle": "none",
+      "corrections": [],
+      "appliedSnippets": []
+    },
+    {
+      "name": "pipeline/whole-beside-inline",
+      "pass": "pipeline",
+      "in": "Use my address. Review prompt.",
+      "out": "Use 12 Bridge Street. Review prompt.",
+      "submit": false,
+      "dictionary": [],
+      "snippets": [
+        {
+          "trigger": "review prompt",
+          "text": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "my address",
+          "text": "12 Bridge Street"
+        }
+      ],
+      "options": {},
+      "fillersRemoved": 0,
+      "selfCorrections": 0,
+      "listStyle": "none",
+      "corrections": [],
+      "appliedSnippets": [
+        {
+          "trigger": "my address",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "name": "wholeUtterance/001",
+      "pass": "wholeUtterance",
+      "in": "review prompt",
+      "out": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+      "submit": false,
+      "snippets": [
+        {
+          "trigger": "review prompt",
+          "text": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "stand up notes",
+          "text": "Yesterday:\nToday:\nBlockers:",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "caf\u00E9 order",
+          "text": "One flat white, please.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "inline one",
+          "text": "INLINE"
+        },
+        {
+          "trigger": "off prompt",
+          "text": "DISABLED",
+          "isEnabled": false,
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "ok",
+          "text": "TOO SHORT",
+          "match": "wholeUtterance"
+        }
+      ],
+      "wholeSnippet": "review prompt"
+    },
+    {
+      "name": "wholeUtterance/002",
+      "pass": "wholeUtterance",
+      "in": "Review prompt.",
+      "out": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+      "submit": false,
+      "snippets": [
+        {
+          "trigger": "review prompt",
+          "text": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "stand up notes",
+          "text": "Yesterday:\nToday:\nBlockers:",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "caf\u00E9 order",
+          "text": "One flat white, please.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "inline one",
+          "text": "INLINE"
+        },
+        {
+          "trigger": "off prompt",
+          "text": "DISABLED",
+          "isEnabled": false,
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "ok",
+          "text": "TOO SHORT",
+          "match": "wholeUtterance"
+        }
+      ],
+      "wholeSnippet": "review prompt"
+    },
+    {
+      "name": "wholeUtterance/003",
+      "pass": "wholeUtterance",
+      "in": "REVIEW PROMPT!",
+      "out": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+      "submit": false,
+      "snippets": [
+        {
+          "trigger": "review prompt",
+          "text": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "stand up notes",
+          "text": "Yesterday:\nToday:\nBlockers:",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "caf\u00E9 order",
+          "text": "One flat white, please.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "inline one",
+          "text": "INLINE"
+        },
+        {
+          "trigger": "off prompt",
+          "text": "DISABLED",
+          "isEnabled": false,
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "ok",
+          "text": "TOO SHORT",
+          "match": "wholeUtterance"
+        }
+      ],
+      "wholeSnippet": "review prompt"
+    },
+    {
+      "name": "wholeUtterance/004",
+      "pass": "wholeUtterance",
+      "in": "  review   prompt  ",
+      "out": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+      "submit": false,
+      "snippets": [
+        {
+          "trigger": "review prompt",
+          "text": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "stand up notes",
+          "text": "Yesterday:\nToday:\nBlockers:",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "caf\u00E9 order",
+          "text": "One flat white, please.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "inline one",
+          "text": "INLINE"
+        },
+        {
+          "trigger": "off prompt",
+          "text": "DISABLED",
+          "isEnabled": false,
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "ok",
+          "text": "TOO SHORT",
+          "match": "wholeUtterance"
+        }
+      ],
+      "wholeSnippet": "review prompt"
+    },
+    {
+      "name": "wholeUtterance/005",
+      "pass": "wholeUtterance",
+      "in": "Review, prompt?",
+      "out": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+      "submit": false,
+      "snippets": [
+        {
+          "trigger": "review prompt",
+          "text": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "stand up notes",
+          "text": "Yesterday:\nToday:\nBlockers:",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "caf\u00E9 order",
+          "text": "One flat white, please.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "inline one",
+          "text": "INLINE"
+        },
+        {
+          "trigger": "off prompt",
+          "text": "DISABLED",
+          "isEnabled": false,
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "ok",
+          "text": "TOO SHORT",
+          "match": "wholeUtterance"
+        }
+      ],
+      "wholeSnippet": "review prompt"
+    },
+    {
+      "name": "wholeUtterance/006",
+      "pass": "wholeUtterance",
+      "in": "\u0022Review prompt\u0022",
+      "out": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+      "submit": false,
+      "snippets": [
+        {
+          "trigger": "review prompt",
+          "text": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "stand up notes",
+          "text": "Yesterday:\nToday:\nBlockers:",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "caf\u00E9 order",
+          "text": "One flat white, please.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "inline one",
+          "text": "INLINE"
+        },
+        {
+          "trigger": "off prompt",
+          "text": "DISABLED",
+          "isEnabled": false,
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "ok",
+          "text": "TOO SHORT",
+          "match": "wholeUtterance"
+        }
+      ],
+      "wholeSnippet": "review prompt"
+    },
+    {
+      "name": "wholeUtterance/007",
+      "pass": "wholeUtterance",
+      "in": "review-prompt",
+      "out": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+      "submit": false,
+      "snippets": [
+        {
+          "trigger": "review prompt",
+          "text": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "stand up notes",
+          "text": "Yesterday:\nToday:\nBlockers:",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "caf\u00E9 order",
+          "text": "One flat white, please.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "inline one",
+          "text": "INLINE"
+        },
+        {
+          "trigger": "off prompt",
+          "text": "DISABLED",
+          "isEnabled": false,
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "ok",
+          "text": "TOO SHORT",
+          "match": "wholeUtterance"
+        }
+      ],
+      "wholeSnippet": "review prompt"
+    },
+    {
+      "name": "wholeUtterance/008",
+      "pass": "wholeUtterance",
+      "in": "reviewprompt",
+      "out": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+      "submit": false,
+      "snippets": [
+        {
+          "trigger": "review prompt",
+          "text": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "stand up notes",
+          "text": "Yesterday:\nToday:\nBlockers:",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "caf\u00E9 order",
+          "text": "One flat white, please.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "inline one",
+          "text": "INLINE"
+        },
+        {
+          "trigger": "off prompt",
+          "text": "DISABLED",
+          "isEnabled": false,
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "ok",
+          "text": "TOO SHORT",
+          "match": "wholeUtterance"
+        }
+      ],
+      "wholeSnippet": "review prompt"
+    },
+    {
+      "name": "wholeUtterance/009",
+      "pass": "wholeUtterance",
+      "in": "Review prompt. Press enter.",
+      "out": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+      "submit": true,
+      "snippets": [
+        {
+          "trigger": "review prompt",
+          "text": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "stand up notes",
+          "text": "Yesterday:\nToday:\nBlockers:",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "caf\u00E9 order",
+          "text": "One flat white, please.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "inline one",
+          "text": "INLINE"
+        },
+        {
+          "trigger": "off prompt",
+          "text": "DISABLED",
+          "isEnabled": false,
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "ok",
+          "text": "TOO SHORT",
+          "match": "wholeUtterance"
+        }
+      ],
+      "wholeSnippet": "review prompt"
+    },
+    {
+      "name": "wholeUtterance/010",
+      "pass": "wholeUtterance",
+      "in": "review prompt press enter",
+      "out": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+      "submit": true,
+      "snippets": [
+        {
+          "trigger": "review prompt",
+          "text": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "stand up notes",
+          "text": "Yesterday:\nToday:\nBlockers:",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "caf\u00E9 order",
+          "text": "One flat white, please.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "inline one",
+          "text": "INLINE"
+        },
+        {
+          "trigger": "off prompt",
+          "text": "DISABLED",
+          "isEnabled": false,
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "ok",
+          "text": "TOO SHORT",
+          "match": "wholeUtterance"
+        }
+      ],
+      "wholeSnippet": "review prompt"
+    },
+    {
+      "name": "wholeUtterance/011",
+      "pass": "wholeUtterance",
+      "in": "Review prompt, hit return",
+      "out": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+      "submit": true,
+      "snippets": [
+        {
+          "trigger": "review prompt",
+          "text": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "stand up notes",
+          "text": "Yesterday:\nToday:\nBlockers:",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "caf\u00E9 order",
+          "text": "One flat white, please.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "inline one",
+          "text": "INLINE"
+        },
+        {
+          "trigger": "off prompt",
+          "text": "DISABLED",
+          "isEnabled": false,
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "ok",
+          "text": "TOO SHORT",
+          "match": "wholeUtterance"
+        }
+      ],
+      "wholeSnippet": "review prompt"
+    },
+    {
+      "name": "wholeUtterance/012",
+      "pass": "wholeUtterance",
+      "in": "review prompt press",
+      "out": "review prompt press",
+      "submit": false,
+      "snippets": [
+        {
+          "trigger": "review prompt",
+          "text": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "stand up notes",
+          "text": "Yesterday:\nToday:\nBlockers:",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "caf\u00E9 order",
+          "text": "One flat white, please.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "inline one",
+          "text": "INLINE"
+        },
+        {
+          "trigger": "off prompt",
+          "text": "DISABLED",
+          "isEnabled": false,
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "ok",
+          "text": "TOO SHORT",
+          "match": "wholeUtterance"
+        }
+      ]
+    },
+    {
+      "name": "wholeUtterance/013",
+      "pass": "wholeUtterance",
+      "in": "please review prompt",
+      "out": "please review prompt",
+      "submit": false,
+      "snippets": [
+        {
+          "trigger": "review prompt",
+          "text": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "stand up notes",
+          "text": "Yesterday:\nToday:\nBlockers:",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "caf\u00E9 order",
+          "text": "One flat white, please.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "inline one",
+          "text": "INLINE"
+        },
+        {
+          "trigger": "off prompt",
+          "text": "DISABLED",
+          "isEnabled": false,
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "ok",
+          "text": "TOO SHORT",
+          "match": "wholeUtterance"
+        }
+      ]
+    },
+    {
+      "name": "wholeUtterance/014",
+      "pass": "wholeUtterance",
+      "in": "review prompt please",
+      "out": "review prompt please",
+      "submit": false,
+      "snippets": [
+        {
+          "trigger": "review prompt",
+          "text": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "stand up notes",
+          "text": "Yesterday:\nToday:\nBlockers:",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "caf\u00E9 order",
+          "text": "One flat white, please.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "inline one",
+          "text": "INLINE"
+        },
+        {
+          "trigger": "off prompt",
+          "text": "DISABLED",
+          "isEnabled": false,
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "ok",
+          "text": "TOO SHORT",
+          "match": "wholeUtterance"
+        }
+      ]
+    },
+    {
+      "name": "wholeUtterance/015",
+      "pass": "wholeUtterance",
+      "in": "the review prompt is long",
+      "out": "the review prompt is long",
+      "submit": false,
+      "snippets": [
+        {
+          "trigger": "review prompt",
+          "text": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "stand up notes",
+          "text": "Yesterday:\nToday:\nBlockers:",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "caf\u00E9 order",
+          "text": "One flat white, please.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "inline one",
+          "text": "INLINE"
+        },
+        {
+          "trigger": "off prompt",
+          "text": "DISABLED",
+          "isEnabled": false,
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "ok",
+          "text": "TOO SHORT",
+          "match": "wholeUtterance"
+        }
+      ]
+    },
+    {
+      "name": "wholeUtterance/016",
+      "pass": "wholeUtterance",
+      "in": "review prompts",
+      "out": "review prompts",
+      "submit": false,
+      "snippets": [
+        {
+          "trigger": "review prompt",
+          "text": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "stand up notes",
+          "text": "Yesterday:\nToday:\nBlockers:",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "caf\u00E9 order",
+          "text": "One flat white, please.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "inline one",
+          "text": "INLINE"
+        },
+        {
+          "trigger": "off prompt",
+          "text": "DISABLED",
+          "isEnabled": false,
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "ok",
+          "text": "TOO SHORT",
+          "match": "wholeUtterance"
+        }
+      ]
+    },
+    {
+      "name": "wholeUtterance/017",
+      "pass": "wholeUtterance",
+      "in": "Stand-up notes.",
+      "out": "Yesterday:\nToday:\nBlockers:",
+      "submit": false,
+      "snippets": [
+        {
+          "trigger": "review prompt",
+          "text": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "stand up notes",
+          "text": "Yesterday:\nToday:\nBlockers:",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "caf\u00E9 order",
+          "text": "One flat white, please.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "inline one",
+          "text": "INLINE"
+        },
+        {
+          "trigger": "off prompt",
+          "text": "DISABLED",
+          "isEnabled": false,
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "ok",
+          "text": "TOO SHORT",
+          "match": "wholeUtterance"
+        }
+      ],
+      "wholeSnippet": "stand up notes"
+    },
+    {
+      "name": "wholeUtterance/018",
+      "pass": "wholeUtterance",
+      "in": "standup notes",
+      "out": "Yesterday:\nToday:\nBlockers:",
+      "submit": false,
+      "snippets": [
+        {
+          "trigger": "review prompt",
+          "text": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "stand up notes",
+          "text": "Yesterday:\nToday:\nBlockers:",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "caf\u00E9 order",
+          "text": "One flat white, please.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "inline one",
+          "text": "INLINE"
+        },
+        {
+          "trigger": "off prompt",
+          "text": "DISABLED",
+          "isEnabled": false,
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "ok",
+          "text": "TOO SHORT",
+          "match": "wholeUtterance"
+        }
+      ],
+      "wholeSnippet": "stand up notes"
+    },
+    {
+      "name": "wholeUtterance/019",
+      "pass": "wholeUtterance",
+      "in": "Caf\u00E9 order.",
+      "out": "One flat white, please.",
+      "submit": false,
+      "snippets": [
+        {
+          "trigger": "review prompt",
+          "text": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "stand up notes",
+          "text": "Yesterday:\nToday:\nBlockers:",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "caf\u00E9 order",
+          "text": "One flat white, please.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "inline one",
+          "text": "INLINE"
+        },
+        {
+          "trigger": "off prompt",
+          "text": "DISABLED",
+          "isEnabled": false,
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "ok",
+          "text": "TOO SHORT",
+          "match": "wholeUtterance"
+        }
+      ],
+      "wholeSnippet": "caf\u00E9 order"
+    },
+    {
+      "name": "wholeUtterance/020",
+      "pass": "wholeUtterance",
+      "in": "Cafe\u0301 order",
+      "out": "One flat white, please.",
+      "submit": false,
+      "snippets": [
+        {
+          "trigger": "review prompt",
+          "text": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "stand up notes",
+          "text": "Yesterday:\nToday:\nBlockers:",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "caf\u00E9 order",
+          "text": "One flat white, please.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "inline one",
+          "text": "INLINE"
+        },
+        {
+          "trigger": "off prompt",
+          "text": "DISABLED",
+          "isEnabled": false,
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "ok",
+          "text": "TOO SHORT",
+          "match": "wholeUtterance"
+        }
+      ],
+      "wholeSnippet": "caf\u00E9 order"
+    },
+    {
+      "name": "wholeUtterance/021",
+      "pass": "wholeUtterance",
+      "in": "caf\u00E9 order \uD83D\uDE42",
+      "out": "One flat white, please.",
+      "submit": false,
+      "snippets": [
+        {
+          "trigger": "review prompt",
+          "text": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "stand up notes",
+          "text": "Yesterday:\nToday:\nBlockers:",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "caf\u00E9 order",
+          "text": "One flat white, please.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "inline one",
+          "text": "INLINE"
+        },
+        {
+          "trigger": "off prompt",
+          "text": "DISABLED",
+          "isEnabled": false,
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "ok",
+          "text": "TOO SHORT",
+          "match": "wholeUtterance"
+        }
+      ],
+      "wholeSnippet": "caf\u00E9 order"
+    },
+    {
+      "name": "wholeUtterance/022",
+      "pass": "wholeUtterance",
+      "in": "inline one",
+      "out": "inline one",
+      "submit": false,
+      "snippets": [
+        {
+          "trigger": "review prompt",
+          "text": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "stand up notes",
+          "text": "Yesterday:\nToday:\nBlockers:",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "caf\u00E9 order",
+          "text": "One flat white, please.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "inline one",
+          "text": "INLINE"
+        },
+        {
+          "trigger": "off prompt",
+          "text": "DISABLED",
+          "isEnabled": false,
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "ok",
+          "text": "TOO SHORT",
+          "match": "wholeUtterance"
+        }
+      ]
+    },
+    {
+      "name": "wholeUtterance/023",
+      "pass": "wholeUtterance",
+      "in": "off prompt",
+      "out": "off prompt",
+      "submit": false,
+      "snippets": [
+        {
+          "trigger": "review prompt",
+          "text": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "stand up notes",
+          "text": "Yesterday:\nToday:\nBlockers:",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "caf\u00E9 order",
+          "text": "One flat white, please.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "inline one",
+          "text": "INLINE"
+        },
+        {
+          "trigger": "off prompt",
+          "text": "DISABLED",
+          "isEnabled": false,
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "ok",
+          "text": "TOO SHORT",
+          "match": "wholeUtterance"
+        }
+      ]
+    },
+    {
+      "name": "wholeUtterance/024",
+      "pass": "wholeUtterance",
+      "in": "ok",
+      "out": "ok",
+      "submit": false,
+      "snippets": [
+        {
+          "trigger": "review prompt",
+          "text": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "stand up notes",
+          "text": "Yesterday:\nToday:\nBlockers:",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "caf\u00E9 order",
+          "text": "One flat white, please.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "inline one",
+          "text": "INLINE"
+        },
+        {
+          "trigger": "off prompt",
+          "text": "DISABLED",
+          "isEnabled": false,
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "ok",
+          "text": "TOO SHORT",
+          "match": "wholeUtterance"
+        }
+      ]
+    },
+    {
+      "name": "wholeUtterance/025",
+      "pass": "wholeUtterance",
+      "in": "press enter",
+      "out": "press enter",
+      "submit": false,
+      "snippets": [
+        {
+          "trigger": "review prompt",
+          "text": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "stand up notes",
+          "text": "Yesterday:\nToday:\nBlockers:",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "caf\u00E9 order",
+          "text": "One flat white, please.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "inline one",
+          "text": "INLINE"
+        },
+        {
+          "trigger": "off prompt",
+          "text": "DISABLED",
+          "isEnabled": false,
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "ok",
+          "text": "TOO SHORT",
+          "match": "wholeUtterance"
+        }
+      ]
+    },
+    {
+      "name": "wholeUtterance/026",
+      "pass": "wholeUtterance",
+      "in": "",
+      "out": "",
+      "submit": false,
+      "snippets": [
+        {
+          "trigger": "review prompt",
+          "text": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "stand up notes",
+          "text": "Yesterday:\nToday:\nBlockers:",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "caf\u00E9 order",
+          "text": "One flat white, please.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "inline one",
+          "text": "INLINE"
+        },
+        {
+          "trigger": "off prompt",
+          "text": "DISABLED",
+          "isEnabled": false,
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "ok",
+          "text": "TOO SHORT",
+          "match": "wholeUtterance"
+        }
+      ]
+    },
+    {
+      "name": "wholeUtterance/027",
+      "pass": "wholeUtterance",
+      "in": "   ",
+      "out": "   ",
+      "submit": false,
+      "snippets": [
+        {
+          "trigger": "review prompt",
+          "text": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "stand up notes",
+          "text": "Yesterday:\nToday:\nBlockers:",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "caf\u00E9 order",
+          "text": "One flat white, please.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "inline one",
+          "text": "INLINE"
+        },
+        {
+          "trigger": "off prompt",
+          "text": "DISABLED",
+          "isEnabled": false,
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "ok",
+          "text": "TOO SHORT",
+          "match": "wholeUtterance"
+        }
+      ]
+    },
+    {
+      "name": "wholeUtterance/no-submit-phrase",
+      "pass": "wholeUtterance",
+      "in": "review prompt press enter",
+      "out": "review prompt press enter",
+      "submit": false,
+      "snippets": [
+        {
+          "trigger": "review prompt",
+          "text": "Review this change as a senior engineer.\n1. one apples two bananas three oranges\n2. Check that cloud code is spelled the way I wrote it, um, here.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "stand up notes",
+          "text": "Yesterday:\nToday:\nBlockers:",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "caf\u00E9 order",
+          "text": "One flat white, please.",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "inline one",
+          "text": "INLINE"
+        },
+        {
+          "trigger": "off prompt",
+          "text": "DISABLED",
+          "isEnabled": false,
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "ok",
+          "text": "TOO SHORT",
+          "match": "wholeUtterance"
+        }
+      ],
+      "options": {
+        "enterCommand": false
+      }
+    },
+    {
+      "name": "wholeUtterance/first-duplicate-wins",
+      "pass": "wholeUtterance",
+      "in": "review prompt",
+      "out": "FIRST",
+      "submit": false,
+      "snippets": [
+        {
+          "trigger": "review prompt",
+          "text": "FIRST",
+          "match": "wholeUtterance"
+        },
+        {
+          "trigger": "Review  Prompt",
+          "text": "SECOND",
+          "match": "wholeUtterance"
+        }
+      ],
+      "wholeSnippet": "review prompt"
+    }
+  ]
+}

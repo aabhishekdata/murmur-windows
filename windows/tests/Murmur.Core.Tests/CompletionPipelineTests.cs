@@ -30,6 +30,19 @@ public sealed class CompletionPipelineTests
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "Murmur", "last-crash.log");
 
+    /// <summary>Reads the crash log while other tests may be appending to it.</summary>
+    /// <remarks>
+    /// <see cref="File.ReadAllText(string)"/> refuses a file another handle has open for
+    /// writing, and the test assemblies run in parallel against the same log.
+    /// </remarks>
+    private static string ReadCrashLog()
+    {
+        using var stream = new FileStream(
+            CrashLogPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
+    }
+
     /// <summary>
     /// Runs <paramref name="action"/> on a dedicated thread — the shape of the real keyboard
     /// hook thread — and fails the test if anything escapes onto it.
@@ -164,7 +177,7 @@ public sealed class CompletionPipelineTests
 
         // And it must be a logged failure, not a silently swallowed one.
         File.Exists(CrashLogPath).ShouldBeTrue("the failure must be recorded");
-        File.ReadAllText(CrashLogPath).ShouldContain(marker);
+        ReadCrashLog().ShouldContain(marker);
     }
 
     [Fact]
@@ -182,7 +195,7 @@ public sealed class CompletionPipelineTests
 
         injector.Injected.ShouldBeEmpty();
         File.Exists(CrashLogPath).ShouldBeTrue("the failure must be recorded");
-        File.ReadAllText(CrashLogPath).ShouldContain(marker);
+        ReadCrashLog().ShouldContain(marker);
 
         // And the engine is still usable afterwards — the failure was one dictation, not the app.
         engine.State.ShouldBe(DictationState.Idle);
@@ -236,7 +249,9 @@ public sealed class CompletionPipelineTests
         await WaitForAsync(() => engine.State == DictationState.Idle,
             "the in-flight dictation must still unwind to idle");
 
-        injector.Injected.ShouldBe(["late text"]);
+        // Disposal cancels the dictation: text arriving after the app has shut down must not
+        // be typed into whatever has focus by then.
+        injector.Injected.ShouldBeEmpty();
     }
 
     /// <summary>A transcriber whose model blows up — exercises the EndAsync catch.</summary>

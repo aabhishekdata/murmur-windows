@@ -2,8 +2,26 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using Murmur.Abstractions;
 
 namespace Murmur.Core;
+
+/// <summary>When a snippet's trigger counts as said.</summary>
+public enum SnippetMatch
+{
+    /// <summary>
+    /// Anywhere in a dictation: "send it to my address please" types the address mid-sentence.
+    /// What every snippet did before saved prompts existed, so it is what an entry without the
+    /// field loads as.
+    /// </summary>
+    Inline,
+
+    /// <summary>
+    /// Only when the trigger is the whole of what was said. The stored text is then pasted
+    /// exactly as written — a saved prompt — and no other pass touches it.
+    /// </summary>
+    WholeUtterance,
+}
 
 /// <summary>One voice-triggered block of text.</summary>
 public sealed record SnippetEntry
@@ -26,6 +44,19 @@ public sealed record SnippetEntry
 
     /// <summary>Disabled snippets stay in the file but stop expanding.</summary>
     public bool IsEnabled { get; init; } = true;
+
+    /// <summary>Whether the trigger fires mid-sentence or only said on its own.</summary>
+    /// <remarks>
+    /// Defaults to <see cref="SnippetMatch.Inline"/> so a <c>snippets.jsonl</c> written before
+    /// this existed keeps behaving exactly as it did. A prompt created in the editor starts as
+    /// <see cref="SnippetMatch.WholeUtterance"/> instead; that choice is the editor's.
+    /// </remarks>
+    [JsonConverter(typeof(JsonStringEnumConverter<SnippetMatch>))]
+    public SnippetMatch Match { get; init; } = SnippetMatch.Inline;
+
+    /// <summary>A key combination that pastes the text without speaking, or null for none.</summary>
+    [JsonConverter(typeof(HotkeyChordJsonConverter))]
+    public HotkeyChord? Hotkey { get; init; }
 
     /// <summary>A one-line preview of the body, for list rows.</summary>
     /// <param name="maxLength">Longest preview to produce.</param>
@@ -67,9 +98,7 @@ public sealed class SnippetStore
     }
 
     /// <summary>The default location, alongside the dictionary and the history.</summary>
-    public static string DefaultPath => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "Murmur", "snippets.jsonl");
+    public static string DefaultPath => MurmurPaths.In("snippets.jsonl");
 
     /// <summary>Where this store lives on disk.</summary>
     public string FilePath => _path;
@@ -237,13 +266,16 @@ public sealed class SnippetExpander
     private sealed record Rule(Regex Regex, string Replacement, string Trigger);
 
     /// <summary>Compiles the enabled snippets into an ordered rule set.</summary>
-    /// <param name="entries">Every snippet. Disabled ones are ignored.</param>
+    /// <param name="entries">Every snippet. Disabled and whole-utterance ones are ignored.</param>
     public SnippetExpander(IEnumerable<SnippetEntry> entries)
     {
         ArgumentNullException.ThrowIfNull(entries);
 
+        // A whole-utterance prompt is matched by WholeUtteranceMatcher before this pass runs,
+        // and must never fire mid-sentence: "please review prompt" is not the prompt.
         _rules = entries
             .Where(e => e.IsEnabled)
+            .Where(e => e.Match == SnippetMatch.Inline)
             .Where(e => e.Trigger.Trim().Length >= MinTriggerLength)
             .Where(e => e.Text.Length > 0)
             .OrderByDescending(e => e.Trigger.Length)
@@ -345,9 +377,11 @@ public sealed record SnippetWarning(string Message)
 
         if (words.Length == 1 && TooCommon.Contains(SpeechText.BareWord(words[0])))
         {
-            warnings.Add(new SnippetWarning(
-                $"\"{trigger}\" is a very common word. Every time you say it, this snippet will "
-                + "replace it. Two or three uncommon words make a safer trigger."));
+            warnings.Add(new SnippetWarning(entry.Match == SnippetMatch.WholeUtterance
+                ? $"\"{trigger}\" is a very common reply. Every time you say just that word, this "
+                  + "prompt will be pasted instead. Two or three uncommon words make a safer trigger."
+                : $"\"{trigger}\" is a very common word. Every time you say it, this snippet will "
+                  + "replace it. Two or three uncommon words make a safer trigger."));
         }
 
         if (entry.Text.Length > SnippetEntry.MaxLength)

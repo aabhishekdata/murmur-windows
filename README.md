@@ -1,14 +1,22 @@
 # Murmur
 
-Push-to-talk dictation that runs entirely on your own machine. Hold a key, talk, release —
-cleaned-up text lands in whatever text field has focus. No cloud, no account, no audio
-leaving the device.
+Push-to-talk dictation that runs on your own machine by default. Hold a key, talk, release —
+cleaned-up text lands in whatever text field has focus. No account, and out of the box no
+cloud: audio stays on the device.
+
+**Privacy, in one paragraph.** On Windows, Parakeet on your PC is the default engine and the
+offline fallback. Cloud transcription is opt-in and uses *your own* Azure OpenAI resource and
+key (`gpt-4o-transcribe` or `gpt-4o-mini-transcribe`); audio leaves the machine only while one
+of the two Azure engine modes is selected, and only to the endpoint you entered. The key is
+encrypted with DPAPI for your Windows account in its own file — it is never written to
+`settings.json`. Speaker labelling (diarization) is not supported. The macOS app has no cloud
+path at all.
 
 This repository holds two implementations:
 
 | | Status |
 |---|---|
-| **[`windows/`](windows/) — the Windows app** | Actively developed. Runs on real hardware; 356 tests green. **Start here.** |
+| **[`windows/`](windows/) — the Windows app** | Actively developed. Runs on real hardware; 935 tests green. **Start here.** |
 | `Sources/`, `Tests/` — the macOS app | Upstream code, unchanged. See [The macOS app](#the-macos-app) below. |
 
 ---
@@ -33,6 +41,18 @@ You need nothing installed to *run* it — the published executable is self-cont
 3. Run `Murmur.App.exe`. SmartScreen will warn that it's unsigned — *More info* → *Run anyway*.
 4. Hold **Right Ctrl**, speak, release.
 
+Also worth knowing: **double-tap** Right Ctrl to keep listening hands-free (tap once more to
+stop), **Esc** cancels a dictation and types nothing, and a shortcut you choose in Settings
+(none by default) pastes your last transcript again. History can paste any transcript and retry the last few with the other engine;
+Home shows words, minutes, time saved and an estimate of what the cloud minutes cost. The bar's
+badge says where your voice went — a laptop for this PC, a cloud for your Azure resource.
+
+Optional, and off unless you choose it: to transcribe with your own Azure OpenAI resource
+instead, open **Settings → Transcription engine**, pick *Azure* or *Azure, offline fallback*,
+enter the endpoint, the `gpt-4o-transcribe` (Accurate) and/or `gpt-4o-mini-transcribe` (Fast)
+deployment names and your key, then press **Test connection**. The tray and bar menus switch
+between Accurate and Fast without a restart.
+
 `windows/artifacts/publish/README-FIRST.md` ships alongside the binary with the same steps.
 
 ## Building it yourself (Windows)
@@ -40,7 +60,7 @@ You need nothing installed to *run* it — the published executable is self-cont
 ```bash
 cd windows
 dotnet build Murmur.sln -c Release          # needs the .NET SDK in global.json
-dotnet test  Murmur.sln -c Release          # 356 tests
+dotnet test  Murmur.sln -c Release          # 935 tests
 dotnet publish src/Murmur.App/Murmur.App.csproj \
   -c Release -r win-x64 --self-contained true \
   -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \

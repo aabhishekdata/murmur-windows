@@ -27,14 +27,26 @@ public sealed class DictationEngineTests
         new(capture, hotkey, transcriber, injector, () => dictionary, new FakeClock());
 
     /// <summary>Presses, waits for capture to drain, then releases.</summary>
-    private static async Task DictateAsync(FakeHotkeySource hotkey, DictationEngine engine)
+    internal static async Task DictateAsync(FakeHotkeySource hotkey, DictationEngine engine)
     {
         hotkey.Press();
-        for (var i = 0; i < 2000 && engine.State != DictationState.Recording; i++) await Task.Yield();
-        for (var i = 0; i < 20000 && engine.Level == 0; i++) await Task.Yield();
+        await UntilAsync(() => engine.State == DictationState.Recording);
+        await UntilAsync(() => engine.Level > 0);
 
         hotkey.Release();
-        for (var i = 0; i < 20000 && engine.State != DictationState.Idle; i++) await Task.Yield();
+        await UntilAsync(() => engine.State == DictationState.Idle);
+    }
+
+    /// <summary>Yields until <paramref name="condition"/> holds, for at most five seconds.</summary>
+    /// <remarks>
+    /// Bounded by time rather than by a count of yields: with every test assembly running at
+    /// once, a fixed number of yields ran out before a loaded machine had finished a dictation,
+    /// and a passing test failed now and then.
+    /// </remarks>
+    internal static async Task UntilAsync(Func<bool> condition)
+    {
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        while (!condition() && clock.Elapsed < TimeSpan.FromSeconds(5)) await Task.Yield();
     }
 
     [Fact]

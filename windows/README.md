@@ -1,10 +1,11 @@
 # Murmur for Windows
 
-The Windows port of Murmur — push-to-talk dictation, on-device.
+The Windows port of Murmur — push-to-talk dictation, on-device by default, with optional
+transcription through your own Azure OpenAI key.
 
 > **Status: working on real hardware.** A person has held the key, spoken, and watched the
 > text land in another application. CI builds, tests and publishes a self-contained
-> executable that passes its own self-test on Windows; 356 tests are green. What is still
+> executable that passes its own self-test on Windows; 935 tests are green. What is still
 > exercised only through fakes — real device enumeration, the Enter keystroke reaching a
 > foreground app — is listed under [Honesty](#honesty).
 
@@ -25,7 +26,8 @@ Almost every layer of the macOS app is Apple-specific:
 
 The consequence that shapes everything: **Windows has no counterpart to Apple's
 `SpeechAnalyzer`.** On macOS, Parakeet is the optional upgrade. On Windows it is the only
-engine, and the app cannot transcribe until the model is downloaded —
+offline engine, and the app cannot transcribe offline until the model is downloaded (or until
+you opt in to Azure with your own key) —
 see [`docs/PARAKEET-WINDOWS.md`](../docs/PARAKEET-WINDOWS.md).
 
 What *is* genuinely shared is the dictionary's behaviour, and it is shared as a contract
@@ -60,30 +62,54 @@ held down forever.
 and forbids the variable tensor shapes this model requires; CUDA would force every user to
 install a toolkit. On CPU with int8 weights, transcription runs ~40× faster than real time.
 
-**Three pinned versions that would break at "latest":**
+**Pinned versions that would break at "latest":**
 
 | Package | Pinned | Why |
 |---|---|---|
 | `NAudio` | **2.3.0** | 3.x targets .NET 9+ and will not restore |
-| `Avalonia.Headless.XUnit` | **11.3.20** | 12.x requires xUnit **v3**, a different package line |
+| `Avalonia.*` | **12.1.4**, all together | 12 lets the render loop sleep when nothing animates (11 ticked forever); an 11 assembly mixed into 12 builds and then fails at run time |
+| `xunit.v3` | **3.2.2** | `Avalonia.Headless.XUnit` 12 is built on the v3 3.x extensibility API; 4.x is a new major. Test projects are `OutputType Exe` |
+| `FluentAvaloniaUI` | 3.1.0 | First line built for Avalonia 12.1; its theme replaces `FluentTheme` (see `Design/AppTheme.cs`) |
 | `org.k2fsa.sherpa.onnx` | 1.13.5 | Bundles ONNX Runtime; never also reference `Microsoft.ML.OnnxRuntime` |
+
+`Avalonia.Diagnostics` has no 12.x release and is no longer referenced.
 
 ---
 
 ## The interface
 
-Two windows and a tray icon.
+Two windows and a tray icon, in the Windows 11 Fluent style (see AGENTS.md → Design system).
 
-**The floating bar** is the primary surface: a small dark pill, frameless, always on top,
-never activated, kept out of the taskbar. It shows four states — at rest, listening (white
-level bars that move with the voice), transcribing (pulsing dots), and "no model". Click it to
-start and stop; drag it and it settles onto the nearest edge, turning vertical on a side; its
-placement is stored as an edge plus a fraction (never pixels — a saved pixel position is
-off-screen the moment a monitor is unplugged, and a frameless taskbar-less window that lands
+**The floating bar** is the primary surface: a small dark capsule at the bottom centre,
+frameless, always on top, never activated, kept out of the taskbar. It shows its states — at
+rest (a dim dot), recording (red dot and white level bars that move with the voice),
+hands-free ("Hands-free — tap to stop"), transcribing (the word, no spinner), and what is in the
+way ("No model", "Add API key"). A badge beside the dot says where your voice goes: a laptop for
+Parakeet on this PC, a cloud for your Azure resource, a struck-out cloud when the offline fallback
+answered — in the bar's muted ink, never red. After a fallback or a dictation that could not be
+transcribed, one short sentence ("Azure unreachable — used Parakeet", "Key rejected — nothing
+typed") shows at rest for a few seconds.
+Click it to start and stop; drag it and it settles onto the nearest edge, turning vertical on a
+side; its placement is stored as an edge plus a fraction (never pixels — a saved pixel position
+is off-screen the moment a monitor is unplugged, and a frameless taskbar-less window that lands
 off-screen cannot be recovered). Right-click for the menu.
 
-**The hub** is the management window: a sidebar over Home (stats and searchable transcript
-history, grouped by day), Dictionary and Settings.
+**The keyboard:** hold the push-to-talk key to dictate; **double-tap** it to latch hands-free and
+tap it again to stop; a single quick tap dictates like a short hold. **Esc** cancels whatever is
+being recorded or transcribed and types nothing, up until the text is ready (the only key Murmur
+ever swallows, and only then); a paste-last shortcut you record in Settings (none by default, so
+nothing is taken from other apps) pastes the last transcript again. The tray and the bar menu have *Copy last transcript*.
+
+**The hub** is the management window: Mica, a 32 px custom title bar, and a navigation pane
+over Home (status, a usage dashboard — words, minutes, time saved, the split by engine and the
+estimated cloud cost, at a typing speed and per-minute prices you can change — suggestions,
+recent dictation), History (searchable, grouped by day, each row saying which engine heard it,
+with Paste and, for the last five, *Retry with the other engine*), Dictionary, Prompts & snippets
+and Settings — groups of Windows 11 setting cards. Light, dark and
+high contrast switch live, and the accent follows Windows' unless it is red.
+
+**First-run setup** walks a new install through the engine, Azure or the offline model, and the
+push-to-talk key with a live "hold it and say hello" check. Anyone upgrading skips it.
 
 `ShowActivated = false` on the bar is not cosmetic. Murmur types into whatever has focus, so a
 bar that takes focus redirects the user's own dictation into itself.
@@ -99,7 +125,7 @@ run in changes the answer. It is fixed in one place — `TextPipeline` — rathe
 the order somebody added them to the engine:
 
 ```
-filler removal → dictionary → self-correction → command extraction → snippets → list formatting
+filler removal → dictionary → self-correction → command extraction → [saved prompt?] → snippets → list formatting
 ```
 
 Each position is load-bearing, and `TextPipelineOrderTests` pins every one of them:
@@ -110,15 +136,66 @@ Each position is load-bearing, and `TextPipelineOrderTests` pins every one of th
 | Dictionary | Before anything that reasons about words, so it reasons about the right ones |
 | Self-correction | After the dictionary (the marker itself can be misheard), before snippets |
 | Command extraction | **Before** expansion, so a snippet body ending "press enter" can never submit |
+| Saved prompt (4b) | If the whole utterance is a prompt's trigger, its text is pasted verbatim and the run stops |
 | Snippets | Trigger is now spelled right, has survived retraction, cannot reach the command |
 | List formatting | Last — the only pass that inserts newlines; everything else matches flat text |
+
+A **saved prompt** is a snippet marked "Say only this": it fires only when its trigger is all
+that was said (case, punctuation, hyphens and spacing ignored), and its text arrives exactly as
+written — pasted through the clipboard, which is then put back. Both writes are marked
+(`CanIncludeInClipboardHistory = 0`, `CanUploadToCloudClipboard = 0`), so prompts and dictation stay out of Win+V history and
+cloud clipboard sync. "Review prompt, press enter"
+pastes it and sends it. A prompt can also have a key combination (Ctrl+Alt+1, say), registered
+with `RegisterHotKey`; pressing it mid-recording discards the recording and pastes the prompt.
+`snippets.jsonl` files written before prompts existed load unchanged, as inline snippets.
 
 Every heuristic pass has a switch in Settings and every switch defaults on. The dictionary has
 no switch: it is not a heuristic, it is what the user typed in.
 
-**There is no language model anywhere in this app and there must not be one.** Every pass above
-is deterministic pattern matching, which is what makes them exhaustively testable — and what
-lets the app promise that nothing dictated ever leaves the machine.
+**There is no language model in the text pipeline and there must not be one.** Every pass above
+is deterministic pattern matching, which is what makes them exhaustively testable — and it runs
+on the PC whichever engine heard the words.
+
+---
+
+## Speech engines and the privacy contract
+
+| Mode | What hears you | Does audio leave the PC? |
+|---|---|---|
+| **Offline (Parakeet)** — the default | Parakeet, on this PC | No |
+| **Azure** | Your own Azure OpenAI deployment | Yes, to the endpoint you entered |
+| **Azure, offline fallback** | Azure; Parakeet when Azure cannot be reached, times out, or answers 408/429/5xx | Yes, to the endpoint you entered |
+
+- **Parakeet is the default and the fallback.** Cloud transcription is opt-in, uses *your* Azure
+  resource and *your* key, and nothing is ever sent while the offline mode is selected.
+- **Two cloud models, each its own deployment:** *Accurate* = `gpt-4o-transcribe` (the default
+  profile) and *Fast* = `gpt-4o-mini-transcribe`. If only one deployment is filled in, that one
+  is used. The tray and bar menus switch between them; it applies on the next dictation.
+- **Diarization is not supported** — `gpt-4o-transcribe-diarize` rejects the prompt that
+  carries your dictionary terms.
+- **Language:** *Detect automatically*, *English*, *Hindi* (sent as `hi`) or *Hinglish* (no
+  language code, plus a prompt asking for Hindi in the Latin alphabet mixed with English). These
+  are for the Azure engines; Parakeet is English-only, Settings warns about it, and a fallback in
+  those modes is labelled "English-only fallback".
+- **Retry with the other engine** keeps the contract: it is offered towards Azure only while an
+  Azure mode is chosen and set up. The audio it needs — the last five dictations — is held in
+  memory, and written to disk (for 24 hours, then deleted) only if you turn on *Keep recent audio
+  for 24 hours* in Settings ▸ Privacy & data.
+- **The key** is entered once in Settings, encrypted with DPAPI for your Windows account
+  (CurrentUser scope) and kept in `%LocalAppData%\Murmur\secrets\azure-key.bin`. It is never
+  written to `settings.json`, logs or error messages, and the UI only ever shows its last four
+  characters. If the file cannot be decrypted (a profile restored onto another PC), Settings
+  asks for the key again.
+- A rejected key (401), a resource whose network rules shut this PC out (403), a missing
+  deployment (404) or a malformed request (400) is shown, not papered over with Parakeet: falling
+  back on those would hide a broken setup. Only a 401 marks the key rejected — a 403 is reported
+  as "Azure blocked this network". Only network trouble, timeouts and 408/429/5xx fall back, and
+  only when the offline model is installed; without it the cloud is always asked. The bar shows *Add API key*, *Set up Azure* or
+  *Key rejected* when the chosen engine cannot work.
+- Requests go through one shared `HttpClient` using the system proxy with your Windows
+  credentials, so corporate proxies work; a proxy that still refuses is reported as 407.
+- **Test connection** sends one second of quiet tone to the profile in use (or, with *Test
+  both*, to each filled-in deployment) and reports status, latency and the Azure region.
 
 ---
 
@@ -131,11 +208,14 @@ windows/
 ├─ global.json                    SDK pin
 ├─ src/
 │  ├─ Murmur.Dictionary/          corrections + biasing          net10.0
-│  ├─ Murmur.Abstractions/        the four platform interfaces   net10.0
+│  ├─ Murmur.Abstractions/        the platform interfaces        net10.0
 │  ├─ Murmur.Core/                engine, segmenter, storage,
 │  │                              the text pipeline, snippets,
-│  │                              bar placement                   net10.0
+│  │                              engine routing, the secret
+│  │                              file, bar placement             net10.0
 │  ├─ Murmur.Speech/              Parakeet via sherpa-onnx       net10.0
+│  ├─ Murmur.Cloud/               Azure OpenAI transcription:
+│  │                              HTTP, retries, WAV, prompt     net10.0
 │  ├─ Murmur.Testing/             fakes for the interfaces       net10.0
 │  ├─ Murmur.App/                 Avalonia UI                    net10.0
 │  └─ Murmur.Platform.Windows/    the ONLY Win32 code            net10.0-windows
@@ -143,10 +223,19 @@ windows/
    ├─ Murmur.Dictionary.Tests/    the shared vectors             24 tests
    ├─ Murmur.Core.Tests/          engine, chunking, storage,
    │                              every text pass and their
-   │                              interactions, placement       267 tests
+   │                              interactions, routing,
+   │                              the key's storage, placement,
+   │                              hands-free, Esc, paste-last,
+   │                              retry, usage stats            568 tests
+   ├─ Murmur.Cloud.Tests/         requests, retries, errors,
+   │                              WAV bytes, prompt, endpoint    64 tests
    └─ Murmur.App.Tests/           headless Avalonia UI,
-                                  rendered previews              65 tests
+                                  engine wiring, previews       279 tests
 ```
+
+`Murmur.Cloud` references `Murmur.Abstractions` only and is an ordinary reference of
+`Murmur.App`, so it is compiled into the single-file exe. Its tests answer every request from a
+stub `HttpMessageHandler`: **no test makes a network call.**
 
 **Only one project targets `-windows`.** Everything else is platform-neutral, so `CA1416`
 turns an accidental Win32 call into a build error — and, more usefully, the whole app
@@ -180,7 +269,7 @@ builds and tests normally, including the full UI suite:
 
 ```bash
 cd windows
-dotnet test Murmur.CrossPlatform.slnf -c Release      # ~10s, 356 tests
+dotnet test Murmur.CrossPlatform.slnf -c Release      # ~15s, 935 tests
 ```
 
 `--no-incremental` is not optional in CI. Roslyn does not re-emit analyzer warnings on an
@@ -190,13 +279,20 @@ incremental build, so `-warnaserror` would pass on cached results and prove noth
 
 ## <a id="honesty"></a>Honesty about what is verified
 
-**Verified, on Windows, every push:** 356 tests pass — 24 dictionary (the shared vectors),
-267 core (dictation state machine, audio chunking, the storage formats, every text pass and the
-order they run in, floating-bar placement), 65 headless Avalonia UI. CI then publishes a self-contained ~116 MB executable, **runs it**, and the
-binary reports back that the dictionary works, the source-generated JSON round-trips, and
-the Windows platform layer loads and constructs out of the bundle.
+**Verified, on Windows, every push:** 935 tests pass — 24 dictionary (the shared vectors),
+568 core (dictation state machine, audio chunking, the storage formats and their backward
+compatibility, every text pass and the order they run in, engine routing and fallback, the key's
+encrypted storage, floating-bar placement, the hands-free gesture's timing table, Esc arming and
+cancelling, paste-last, retry, the usage arithmetic), 64 cloud (request shape, multipart fields,
+WAV bytes, retry and no-retry tables, `Retry-After`, timeout versus cancellation, the size guard,
+the key never leaking), 279 headless Avalonia UI. CI then publishes a self-contained ~116 MB executable, **runs it**, and the
+binary reports back that the dictionary works, the source-generated JSON round-trips, the
+Windows platform layer loads and constructs out of the bundle, and DPAPI round-trips a key
+through the secret file without it appearing in the clear.
 
-**Verified on macOS and Linux, in a few seconds:** the same 356 tests. The UI genuinely runs
+**Verified on macOS and Linux, in a few seconds:** the same 935 tests. The Azure
+client and its tests are platform-neutral; only the DPAPI binding is Windows-only, and the
+self-test covers it. The UI genuinely runs
 headless here — with Skia rather than the no-op drawing backend, so every `Render` is really
 executed — which is why bugs like a `Render` method mutating a property get caught while
 writing them rather than three CI round-trips later. The same run rasterises every screen to
@@ -217,6 +313,9 @@ that are *not* fixable are simply avoided: ICU folds `ß` to `ss` and .NET does 
   mid-capture.
 - The low-level keyboard hook actually firing on a physical keypress.
 - Parakeet transcribing real speech, and whether the ~2 GB working set is tolerable.
+- A real Azure OpenAI resource answering: the tests never make a network call, so the request
+  shape is checked against the documented API, not against Azure itself. **Test connection** in
+  Settings is the check, and the first thing to run on a new setup.
 
 Everything those depend on is behind an interface and exercised with fakes, so the logic
 around them is tested. The bindings themselves are not.

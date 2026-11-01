@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Murmur.Abstractions;
 using SherpaOnnx;
 
@@ -17,7 +18,8 @@ namespace Murmur.Speech;
 /// provider silently falls back to CPU. DirectML is several releases behind, forbids parallel
 /// inference, and wants fixed tensor shapes, which a variable-length audio model cannot
 /// provide. With int8 weights on four threads this runs roughly 40× faster than real time,
-/// so none of that is worth the dependency.
+/// so none of that is worth the dependency. The thread count is <see cref="ParakeetOptions"/>,
+/// so a small laptop is not asked to give four cores to every dictation.
 /// </para>
 /// <para>
 /// <b>Biasing is not supported by this engine.</b> sherpa-onnx's offline recogniser has no
@@ -29,8 +31,6 @@ namespace Murmur.Speech;
 /// </remarks>
 public sealed class ParakeetTranscriber : ITranscriber
 {
-    /// <summary>Threads for inference. Four measured fastest; eight measured slower.</summary>
-    private const int Threads = 4;
 
     /// <summary>
     /// Feature dimension. <b>Must be 128</b> — the library defaults to 80, which is wrong for
@@ -44,6 +44,7 @@ public sealed class ParakeetTranscriber : ITranscriber
     private const string ModelType = "nemo_transducer";
 
     private readonly string _modelDirectory;
+    private readonly ParakeetOptions _options;
     private OfflineRecognizer? _recognizer;
 
     /// <summary>Points the engine at a folder of model files.</summary>
@@ -51,7 +52,12 @@ public sealed class ParakeetTranscriber : ITranscriber
     /// Must contain <c>encoder.int8.onnx</c>, <c>decoder.int8.onnx</c>,
     /// <c>joiner.int8.onnx</c> and <c>tokens.txt</c>.
     /// </param>
-    public ParakeetTranscriber(string modelDirectory) => _modelDirectory = modelDirectory;
+    /// <param name="options">Tuning; defaults to automatic threading.</param>
+    public ParakeetTranscriber(string modelDirectory, ParakeetOptions? options = null)
+    {
+        _modelDirectory = modelDirectory;
+        _options = options ?? new ParakeetOptions();
+    }
 
     /// <summary>Where the model is looked for, in order.</summary>
     /// <remarks>
@@ -108,7 +114,7 @@ public sealed class ParakeetTranscriber : ITranscriber
         config.ModelConfig.Transducer.Joiner = Path.Combine(_modelDirectory, "joiner.int8.onnx");
         config.ModelConfig.Tokens = Path.Combine(_modelDirectory, "tokens.txt");
         config.ModelConfig.ModelType = ModelType;
-        config.ModelConfig.NumThreads = Threads;
+        config.ModelConfig.NumThreads = _options.ResolvedThreads;
         config.ModelConfig.Provider = "cpu";
         config.DecodingMethod = "greedy_search";
 
@@ -132,11 +138,27 @@ public sealed class ParakeetTranscriber : ITranscriber
         cancellationToken.ThrowIfCancellationRequested();
 
         using var stream = _recognizer.CreateStream();
-        stream.AcceptWaveform(AudioChunk.SampleRate, samples.ToArray());
+        stream.AcceptWaveform(AudioChunk.SampleRate, WholeArray(samples));
         _recognizer.Decode(stream);
 
         return ValueTask.FromResult(stream.Result.Text?.Trim() ?? string.Empty);
     }
+
+    /// <summary>
+    /// The samples as a whole <c>float[]</c>, copying only when they are not already one.
+    /// </summary>
+    /// <remarks>
+    /// sherpa-onnx takes nothing but an array, with no offset or length. The engine hands over
+    /// an exact-length array for an ordinary dictation, so that one is passed straight through;
+    /// only a slice of a long recording split by <c>AudioSegmenter</c> needs its own copy.
+    /// </remarks>
+    internal static float[] WholeArray(ReadOnlyMemory<float> samples) =>
+        MemoryMarshal.TryGetArray(samples, out var segment)
+        && segment.Array is { } array
+        && segment.Offset == 0
+        && segment.Count == array.Length
+            ? array
+            : samples.ToArray();
 
     /// <inheritdoc />
     public ValueTask DisposeAsync()
@@ -145,4 +167,29 @@ public sealed class ParakeetTranscriber : ITranscriber
         _recognizer = null;
         return ValueTask.CompletedTask;
     }
+}
+
+/// <summary>Tuning for <see cref="ParakeetTranscriber"/>.</summary>
+public sealed record ParakeetOptions
+{
+    /// <summary>Most threads automatic sizing will ever pick.</summary>
+    /// <remarks>Four measured fastest; eight measured slower, not faster.</remarks>
+    public const int MaxAutoThreads = 4;
+
+    /// <summary>Inference threads, or 0 to size automatically.</summary>
+    public int Threads { get; init; }
+
+    /// <summary>The thread count actually used.</summary>
+    /// <remarks>
+    /// Automatic is half the logical processors, between one and <see cref="MaxAutoThreads"/>.
+    /// Half, because the cores are hyper-threaded siblings more often than not and a dictation
+    /// that saturates every one of them makes the app being typed into stutter.
+    /// </remarks>
+    public int ResolvedThreads => Threads > 0 ? Threads : AutoThreads(Environment.ProcessorCount);
+
+    /// <summary>The automatic thread count for a machine with <paramref name="processorCount"/>.</summary>
+    /// <param name="processorCount">Logical processors.</param>
+    /// <returns><c>Clamp(processorCount / 2, 1, 4)</c>.</returns>
+    public static int AutoThreads(int processorCount) =>
+        Math.Clamp(processorCount / 2, 1, MaxAutoThreads);
 }

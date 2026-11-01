@@ -6,7 +6,7 @@ Built from https://github.com/per-simmons/murmur-youtube (windows/, win-x64, sel
 Keep `Murmur.App.exe`, `Murmur.Platform.Windows.dll` and the `NAudio*.dll` files together — the platform layer is loaded from beside the exe at startup. Avoid `C:\Program Files` (the app can't write there without admin rights).
 
 ## 2. Download the speech model (one time, ~661 MB)
-Windows has no built-in speech engine the app can use, so it cannot transcribe until the Parakeet model is on disk. Right-click `get-model.ps1` → Run with PowerShell (or run `powershell -ExecutionPolicy Bypass -File .\get-model.ps1`). It downloads to `%LOCALAPPDATA%\Murmur\models\parakeet-v2`.
+Needed for offline transcription, the default, and for the Azure-with-fallback mode. Windows has no built-in speech engine the app can use, so the offline engine cannot transcribe until the Parakeet model is on disk. If you only use your own Azure OpenAI resource, you can skip this step. Right-click `get-model.ps1` → Run with PowerShell (or run `powershell -ExecutionPolicy Bypass -File .\get-model.ps1`). It downloads to `%LOCALAPPDATA%\Murmur\models\parakeet-v2`.
 
 If you dictate in a language other than English, edit the script: `parakeet-v2` → `parakeet-v3` and `-v2-int8` → `-v3-int8` (25 languages).
 
@@ -15,12 +15,15 @@ Double-click `Murmur.App.exe`. Windows SmartScreen may warn because the exe is u
 
 Hold **Right Ctrl**, speak, release — the cleaned-up text lands in the active text field.
 
-## The floating bar
-A small dark pill appears at the bottom of the screen. It floats above other windows, never takes focus, and shows what Murmur is doing:
+## First run
+The first time it starts, Murmur opens a short setup window: choose where your voice is transcribed (on this PC, or your own Azure OpenAI resource), pick the push-to-talk key, and try it by holding the key and saying "hello". Everything there can be changed later in Settings.
 
-- **at rest** — a dim dot and a row of small bars
+## The floating bar
+A small dark capsule appears at the bottom centre of the screen. It floats above other windows, never takes focus, and shows what Murmur is doing:
+
+- **at rest** — a dim dot
 - **listening** — a red dot and white bars that move with your voice, plus a ✕ to stop
-- **transcribing** — three pulsing dots
+- **transcribing** — the word "Transcribing"
 - **"No model"** — an amber dot, meaning the download in step 2 hasn't happened yet
 
 **Right-click** it for the menu: open Murmur, transcript history, which microphone to use, which edge to dock to, hide the bar, quit.
@@ -40,7 +43,7 @@ Right-click the bar → **Open Murmur**, or the tray icon → **Open Murmur**. F
 Closing this window leaves Murmur running in the tray. Quit is explicit, from the tray or the bar's menu.
 
 ## What Murmur does to your words
-Five clean-up passes run on the transcript before it is typed. Every one is pattern matching — there is no language model anywhere in Murmur, nothing you say leaves the machine, and the same words always produce the same text. Each has its own switch in **Settings → Clean up what I say**, and all of them start on.
+Five clean-up passes run on the transcript before it is typed. Every one is pattern matching on this PC — there is no language model anywhere in Murmur, and the same words always produce the same text. Each has its own switch in **Settings → Clean up what I say**, and all of them start on.
 
 | You say | Murmur types |
 |---|---|
@@ -74,6 +77,6 @@ Murmur cannot watch you fix a word in another application — it types into othe
 Right-click the bar → **Microphone**, or **Settings → Microphone**. A microphone you pick by hand overrides both of Windows' defaults (Windows keeps a separate "default" and "default communications" device, and they often disagree). If the one you picked is unplugged, Murmur falls back to the system default rather than failing to record.
 
 ## Notes
-- Expect ~2 GB of RAM used while the model is loaded; transcription is fully offline and ~40× faster than real time on CPU.
+- Expect ~2 GB of RAM used while the model is loaded; offline transcription runs ~40× faster than real time on CPU. Nothing leaves the PC unless you choose Azure OpenAI, and then audio goes only to the endpoint you entered.
 - The upstream project marks this build "feature-complete, never run on real hardware" — you may be the first human to actually dictate into it, so treat rough edges as expected.
 - To sanity-check the install, run `Murmur.App.exe --selftest` in a terminal; exit code 0 means the bundle, JSON round-trip and platform layer all load correctly.

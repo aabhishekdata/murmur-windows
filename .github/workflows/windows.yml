@@ -71,13 +71,16 @@ jobs:
       # The published exe is the only artifact CI can actually run, and a runner cannot
       # show a window — so --selftest exercises startup, native library resolution out of
       # the self-extracted bundle, and model discovery, then exits. That is the class of
-      # failure that appears only after publishing.
+      # failure that appears only after publishing. ReadyToRun precompiles the bundle so a
+      # cold start does not JIT the whole UI; NativeAOT is not an option because the
+      # platform layer is loaded by reflection. Still one self-contained exe, no installer.
       - name: Publish and smoke-test the real exe
         shell: pwsh
         run: |
           dotnet publish src/Murmur.App/Murmur.App.csproj `
             --configuration Release --runtime win-x64 --self-contained true `
             -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:PublishReadyToRun=true `
             --output artifacts/publish
           $exe = 'artifacts/publish/Murmur.App.exe'
           if (-not (Test-Path $exe)) { throw "Published exe not found at $exe" }
@@ -88,11 +91,28 @@ jobs:
           $run = Start-Process -FilePath $exe -ArgumentList '--selftest' -Wait -PassThru -NoNewWindow
           if ($run.ExitCode -ne 0) { throw "self-test failed with exit code $($run.ExitCode)" }
 
-      - name: Upload the exe
+      # The same payload check as the release. The platform layer and NAudio sit loose beside
+      # the exe, not inside the bundle, so an artifact holding the exe alone starts and then
+      # cannot open a microphone, register a hotkey or type anything. The setup notes, the
+      # model downloader and the licence notices go in too, so a CI build is a working folder.
+      - name: Verify the payload is complete
+        shell: pwsh
+        run: |
+          $dir = 'artifacts/publish'
+          Copy-Item 'packaging/README-FIRST.md', 'packaging/get-model.ps1', '../THIRD-PARTY-NOTICES.md' $dir -Force
+          $required = @('Murmur.App.exe', 'Murmur.Platform.Windows.dll', 'NAudio.dll',
+                        'NAudio.Core.dll', 'NAudio.Wasapi.dll', 'NAudio.WinMM.dll',
+                        'NAudio.Asio.dll', 'NAudio.Midi.dll', 'NAudio.WinForms.dll',
+                        'README-FIRST.md', 'get-model.ps1', 'THIRD-PARTY-NOTICES.md')
+          $missing = $required | Where-Object { -not (Test-Path (Join-Path $dir $_)) }
+          if ($missing) { throw "Publish output is missing: $($missing -join ', ')" }
+          Get-ChildItem $dir -Include *.pdb, *.xml -Recurse | Remove-Item -Force
+
+      - name: Upload the app folder
         uses: actions/upload-artifact@v4
         with:
           name: Murmur-win-x64
-          path: windows/artifacts/publish/Murmur.App.exe
+          path: windows/artifacts/publish/
           if-no-files-found: error
           compression-level: 0
 

@@ -76,8 +76,23 @@ public sealed class FakeAudioCapture : IAudioCapture
 }
 
 /// <summary>A hotkey you press from a test.</summary>
-public sealed class FakeHotkeySource : IHotkeySource
+public sealed class FakeHotkeySource : IHotkeySource, ICancelKeySource
 {
+    /// <inheritdoc />
+    public event EventHandler? CancelPressed;
+
+    /// <inheritdoc />
+    public bool CancelArmed { get; set; }
+
+    /// <summary>Presses Esc as the hook would: raised, and swallowed, only while armed.</summary>
+    /// <returns>Whether the press was swallowed.</returns>
+    public bool PressEscape()
+    {
+        if (!CancelArmed) return false;
+        CancelPressed?.Invoke(this, EventArgs.Empty);
+        return true;
+    }
+
     /// <inheritdoc />
     public event EventHandler? Pressed;
 
@@ -86,6 +101,9 @@ public sealed class FakeHotkeySource : IHotkeySource
 
     /// <summary>Whether <see cref="Start"/> has been called.</summary>
     public bool IsRunning { get; private set; }
+
+    /// <inheritdoc />
+    public int VirtualKey { get; set; } = 0xA3;
 
     /// <inheritdoc />
     public bool Start() { IsRunning = true; return true; }
@@ -168,10 +186,18 @@ public sealed class RecordingTextInjector : ITextInjector
     /// </remarks>
     public int InjectedCountAtFirstEnter { get; private set; } = -1;
 
+    /// <summary>For each entry in <see cref="Injected"/>, whether it was asked for verbatim.</summary>
+    public List<bool> Verbatim { get; } = [];
+
     /// <inheritdoc />
-    public ValueTask<bool> InjectAsync(string text, CancellationToken cancellationToken)
+    public ValueTask<bool> InjectAsync(string text, CancellationToken cancellationToken) =>
+        InjectAsync(text, verbatim: false, cancellationToken);
+
+    /// <inheritdoc />
+    public ValueTask<bool> InjectAsync(string text, bool verbatim, CancellationToken cancellationToken)
     {
         Injected.Add(text);
+        Verbatim.Add(verbatim);
         return ValueTask.FromResult(true);
     }
 
@@ -205,4 +231,228 @@ public sealed class FakeClock : IClock
 
     /// <summary>Moves time forward.</summary>
     public void Advance(TimeSpan by) => Now += by;
+}
+
+/// <summary>
+/// A <see cref="TimeProvider"/> whose timers fire only when the test advances it.
+/// </summary>
+/// <remarks>
+/// Anything debounced is tested against this rather than against <c>Task.Delay</c>: a test
+/// that sleeps to let a real timer fire is a test that fails on a slow CI runner. Timer
+/// callbacks run synchronously inside <see cref="Advance"/>, on the test's own thread.
+/// </remarks>
+public sealed class ManualTimeProvider : TimeProvider
+{
+    private readonly List<ManualTimer> _timers = [];
+    private DateTimeOffset _now = new(2026, 1, 1, 12, 0, 0, TimeSpan.Zero);
+
+    /// <inheritdoc />
+    public override DateTimeOffset GetUtcNow() => _now;
+
+    /// <inheritdoc />
+    public override ITimer CreateTimer(
+        TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+    {
+        var timer = new ManualTimer(this, callback, state);
+        timer.Change(dueTime, period);
+        lock (_timers) _timers.Add(timer);
+        return timer;
+    }
+
+    /// <summary>Moves time forward, firing every timer that comes due on the way.</summary>
+    /// <param name="by">How far.</param>
+    public void Advance(TimeSpan by)
+    {
+        var target = _now + by;
+
+        while (true)
+        {
+            ManualTimer? next;
+            lock (_timers)
+            {
+                next = _timers
+                    .Where(t => t.DueAt is { } due && due <= target)
+                    .OrderBy(t => t.DueAt)
+                    .FirstOrDefault();
+            }
+
+            if (next is null) break;
+
+            _now = next.DueAt!.Value;
+            next.Fire();
+        }
+
+        _now = target;
+    }
+
+    private void Remove(ManualTimer timer)
+    {
+        lock (_timers) _timers.Remove(timer);
+    }
+
+    private sealed class ManualTimer(ManualTimeProvider owner, TimerCallback callback, object? state) : ITimer
+    {
+        private TimeSpan _period = Timeout.InfiniteTimeSpan;
+
+        public DateTimeOffset? DueAt { get; private set; }
+
+        public bool Change(TimeSpan dueTime, TimeSpan period)
+        {
+            DueAt = dueTime == Timeout.InfiniteTimeSpan ? null : owner._now + dueTime;
+            _period = period;
+            return true;
+        }
+
+        public void Fire()
+        {
+            DueAt = _period == Timeout.InfiniteTimeSpan || _period == TimeSpan.Zero
+                ? null
+                : DueAt + _period;
+            callback(state);
+        }
+
+        public void Dispose() => owner.Remove(this);
+
+        public ValueTask DisposeAsync()
+        {
+            Dispose();
+            return ValueTask.CompletedTask;
+        }
+    }
+}
+
+/// <summary>
+/// A transcriber that follows a script: answer, throw, or hang, one step per call.
+/// </summary>
+/// <remarks>
+/// For the failure paths <see cref="FakeTranscriber"/> cannot reach — timeouts, fallbacks,
+/// cancellation and unloading under a decode. Each call takes the next step; the last step
+/// repeats once the script runs out, and an empty script answers with an empty string.
+/// </remarks>
+public sealed class ScriptedTranscriber : ITranscriber, ITranscriberDescriptor
+{
+    private readonly Queue<Func<CancellationToken, Task<string>>> _steps = new();
+    private readonly Lock _lock = new();
+    private readonly SemaphoreSlim _calls = new(0);
+    private readonly TaskCompletionSource _released = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private Func<CancellationToken, Task<string>>? _last;
+    private int _inFlight;
+
+    /// <summary>Creates an empty script.</summary>
+    /// <param name="kind">What engine this pretends to be.</param>
+    public ScriptedTranscriber(TranscriberKind kind = TranscriberKind.Unknown) => Kind = kind;
+
+    /// <inheritdoc />
+    public TranscriberKind Kind { get; }
+
+    /// <summary>What <see cref="LoadAsync"/> answers. True by default.</summary>
+    public bool LoadResult { get; set; } = true;
+
+    /// <inheritdoc />
+    public bool IsReady { get; private set; }
+
+    /// <summary>How many times <see cref="LoadAsync"/> was called.</summary>
+    public int LoadCalls { get; private set; }
+
+    /// <summary>How many times <see cref="TranscribeAsync"/> was called.</summary>
+    public int Calls { get; private set; }
+
+    /// <summary>How many times <see cref="DisposeAsync"/> was called.</summary>
+    public int DisposeCalls { get; private set; }
+
+    /// <summary>Whether it was disposed while a call was still running — the bug to catch.</summary>
+    public bool DisposedWhileInFlight { get; private set; }
+
+    /// <summary>Whether any call saw its token cancelled.</summary>
+    public bool ObservedCancellation { get; private set; }
+
+    /// <summary>Answers <paramref name="text"/>.</summary>
+    public ScriptedTranscriber Returns(string text) => Then(_ => Task.FromResult(text));
+
+    /// <summary>Throws <paramref name="exception"/>.</summary>
+    public ScriptedTranscriber Throws(Exception exception) => Then(_ => Task.FromException<string>(exception));
+
+    /// <summary>Waits until the call is cancelled, then throws as a well-behaved engine would.</summary>
+    public ScriptedTranscriber Hangs() => Then(async token =>
+    {
+        try
+        {
+            await Task.Delay(Timeout.Infinite, token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            ObservedCancellation = true;
+            throw;
+        }
+
+        return string.Empty;
+    });
+
+    /// <summary>
+    /// Ignores its token and waits for <see cref="Release"/>, then answers <paramref name="text"/>.
+    /// </summary>
+    /// <remarks>The shape of Parakeet's native decode, which cannot be interrupted.</remarks>
+    public ScriptedTranscriber HangsUntilReleased(string text) => Then(async _ =>
+    {
+        await _released.Task.ConfigureAwait(false);
+        return text;
+    });
+
+    /// <summary>Lets every <see cref="HangsUntilReleased"/> step finish.</summary>
+    public void Release() => _released.TrySetResult();
+
+    /// <summary>Waits for the next call to begin.</summary>
+    /// <param name="timeout">How long to wait; ten seconds when omitted.</param>
+    /// <returns>True if a call began in time.</returns>
+    public Task<bool> WaitForCallAsync(TimeSpan? timeout = null) =>
+        _calls.WaitAsync(timeout ?? TimeSpan.FromSeconds(10));
+
+    private ScriptedTranscriber Then(Func<CancellationToken, Task<string>> step)
+    {
+        lock (_lock) _steps.Enqueue(step);
+        return this;
+    }
+
+    /// <inheritdoc />
+    public ValueTask<bool> LoadAsync(CancellationToken cancellationToken)
+    {
+        LoadCalls++;
+        IsReady = LoadResult;
+        return ValueTask.FromResult(LoadResult);
+    }
+
+    /// <inheritdoc />
+    public async ValueTask<string> TranscribeAsync(
+        ReadOnlyMemory<float> samples,
+        IReadOnlyList<string> biasPhrases,
+        CancellationToken cancellationToken)
+    {
+        Func<CancellationToken, Task<string>> step;
+        lock (_lock)
+        {
+            Calls++;
+            if (_steps.Count > 0) _last = _steps.Dequeue();
+            step = _last ?? (static _ => Task.FromResult(string.Empty));
+        }
+
+        Interlocked.Increment(ref _inFlight);
+        _calls.Release();
+        try
+        {
+            return await step(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            Interlocked.Decrement(ref _inFlight);
+        }
+    }
+
+    /// <inheritdoc />
+    public ValueTask DisposeAsync()
+    {
+        DisposeCalls++;
+        if (Volatile.Read(ref _inFlight) > 0) DisposedWhileInFlight = true;
+        IsReady = false;
+        return ValueTask.CompletedTask;
+    }
 }

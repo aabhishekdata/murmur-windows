@@ -20,18 +20,24 @@
        them. Opening them to the test assembly is cheaper than making them public. -->
   <ItemGroup>
     <InternalsVisibleTo Include="Murmur.App.Tests" />
+    <!-- The opt-in end-to-end suite wires the real pipeline exactly as Composition does, and
+         reuses its internal helpers (time limits, key-rejection tracking) rather than copying them. -->
+    <InternalsVisibleTo Include="Murmur.E2E.Tests" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Avalonia" />
     <PackageReference Include="Avalonia.Desktop" />
-    <PackageReference Include="Avalonia.Themes.Fluent" />
     <PackageReference Include="Avalonia.Fonts.Inter" />
+    <PackageReference Include="FluentAvaloniaUI" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Murmur.Core\Murmur.Core.csproj" />
     <ProjectReference Include="..\Murmur.Speech\Murmur.Speech.csproj" />
+    <!-- An ordinary reference, unlike the platform layer: plain net10.0, so it is compiled in
+         and bundled into the single-file exe with everything else. -->
+    <ProjectReference Include="..\Murmur.Cloud\Murmur.Cloud.csproj" />
   </ItemGroup>
 
   <!-- The Windows platform layer targets net10.0-windows and is resolved by reflection at
@@ -52,24 +58,28 @@
 
   <!-- ReferenceOutputAssembly=false suppresses the copy too, so bring the assembly across
        explicitly. PlatformFactory resolves it by name at startup. -->
+  <!-- Runs after Publish and copies straight into the publish folder. Adding the files to
+       ResolvedFileToPublish before ComputeResolvedFilesToPublishList stopped working on the
+       10.0.4xx SDK's single-file path: the target never ran and the zip shipped with neither
+       the platform layer nor NAudio, so the exe started and then could not open a microphone.
+       Loose beside the exe rather than inside the bundle: PublishSingleFile only bundles
+       assemblies the compiler knows about, and this one is deliberately invisible to it.
+       The default load context probes AppContext.BaseDirectory, and Program.cs installs a
+       resolver as a belt-and-braces fallback. -->
   <Target Name="PublishWindowsPlatformLayer"
-          BeforeTargets="ComputeResolvedFilesToPublishList"
+          AfterTargets="Publish"
           Condition="'$([System.OperatingSystem]::IsWindows())' == 'true'">
     <MSBuild Projects="..\Murmur.Platform.Windows\Murmur.Platform.Windows.csproj"
              Targets="Build"
-             Properties="Configuration=$(Configuration)" />
+             Properties="Configuration=$(Configuration)"
+             RemoveProperties="RuntimeIdentifier;SelfContained;PublishSingleFile;PublishReadyToRun;IncludeNativeLibrariesForSelfExtract;PublishDir;_IsPublishing" />
     <ItemGroup>
       <_PlatformPublish Include="..\Murmur.Platform.Windows\bin\$(Configuration)\net10.0-windows\Murmur.Platform.Windows.dll" />
       <_PlatformPublish Include="..\Murmur.Platform.Windows\bin\$(Configuration)\net10.0-windows\NAudio*.dll" />
-      <!-- Loose beside the exe rather than inside the bundle: PublishSingleFile only bundles
-           assemblies the compiler knows about, and this one is deliberately invisible to it.
-           The default load context probes AppContext.BaseDirectory, and Program.cs installs
-           a resolver as a belt-and-braces fallback. -->
-      <ResolvedFileToPublish Include="@(_PlatformPublish)">
-        <RelativePath>%(Filename)%(Extension)</RelativePath>
-        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-      </ResolvedFileToPublish>
     </ItemGroup>
+    <Error Condition="'@(_PlatformPublish->Count())' &lt; '2'"
+           Text="The Windows platform layer or NAudio was not found to publish beside the exe." />
+    <Copy SourceFiles="@(_PlatformPublish)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
   </Target>
 
   <Target Name="CopyWindowsPlatformLayer"

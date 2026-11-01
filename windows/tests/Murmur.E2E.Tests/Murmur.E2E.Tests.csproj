@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Opt-in end-to-end suite: real speech through the real pipeline, on this PC. Every test skips
+    unless MURMUR_E2E=1, so CI and an ordinary `dotnet test Murmur.sln` are unaffected. See
+    docs/TESTING-LOCAL.md.
+
+    net10.0-windows, and in Murmur.sln only (not Murmur.CrossPlatform.slnf): it uses the real
+    DPAPI protector from the platform layer and needs the Parakeet model on disk.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <!-- xUnit v3 test projects are self-hosting executables. -->
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <EnableTrimAnalyzer>false</EnableTrimAnalyzer>
+    <EnableSingleFileAnalyzer>false</EnableSingleFileAnalyzer>
+    <NoWarn>$(NoWarn);CS1591;CA1707;CA1716;CA1062;CA1034</NoWarn>
+  </PropertyGroup>
+
+  <!-- Kestrel, for the stand-in Azure endpoint on 127.0.0.1. Part of the shared framework, so
+       there is no package version to pin. -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Shouldly" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Murmur.App\Murmur.App.csproj" />
+    <ProjectReference Include="..\..\src\Murmur.Platform.Windows\Murmur.Platform.Windows.csproj" />
+    <ProjectReference Include="..\..\src\Murmur.Testing\Murmur.Testing.csproj" />
+  </ItemGroup>
+</Project>

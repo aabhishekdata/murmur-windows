@@ -44,9 +44,7 @@ public sealed class DictionaryFile
     }
 
     /// <summary>The default location, alongside the transcript history.</summary>
-    public static string DefaultPath => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "Murmur", "dictionary.txt");
+    public static string DefaultPath => MurmurPaths.In("dictionary.txt");
 
     /// <summary>
     /// Where this dictionary lives on disk.

@@ -2,6 +2,8 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Threading;
+using Murmur.Abstractions;
 using Murmur.App.Controls;
 using Murmur.App.Design;
 using Murmur.Core;
@@ -9,38 +11,55 @@ using Murmur.Core;
 namespace Murmur.App.Views;
 
 /// <summary>
-/// Snippets: a spoken phrase in, a stored block of text out.
+/// Prompts and snippets: a spoken phrase (or a key combination) in, a stored block of text out.
 /// </summary>
 /// <remarks>
+/// <para>
 /// Built to the same shape as <see cref="DictionaryView"/> on purpose — the two features are
 /// structurally identical from the user's side (stored entries, a search, a row per entry, an
 /// editor dialog), and making them look and behave differently would be inventing a second way
 /// to do the same thing.
+/// </para>
+/// <para>
+/// One store holds both kinds. A <i>prompt</i> fires only when its trigger is the whole
+/// dictation and is pasted verbatim; a <i>snippet</i> expands wherever its trigger is said. The
+/// row says which, along with any shortcut and whether that shortcut could be registered.
+/// </para>
 /// </remarks>
 public sealed class SnippetsView : UserControl
 {
     private readonly SnippetStore _store;
+    private readonly SnippetHotkeyBinder? _hotkeys;
+    private readonly PasteLastTranscript? _pasteLast;
     private readonly TextBox _search;
+    private readonly Debouncer _searchDebounce;
     private readonly StackPanel _list;
     private readonly Caption _count;
 
     /// <summary>Builds the view over <paramref name="store"/>.</summary>
     /// <param name="store">The snippet store.</param>
-    public SnippetsView(SnippetStore store)
+    /// <param name="hotkeys">Registers prompt shortcuts and reports conflicts; null where there is none.</param>
+    /// <param name="pasteLast">
+    /// The paste-last shortcut, given back with the prompts' while one is recorded; null where there is none.
+    /// </param>
+    public SnippetsView(SnippetStore store, SnippetHotkeyBinder? hotkeys = null, PasteLastTranscript? pasteLast = null)
     {
         ArgumentNullException.ThrowIfNull(store);
         _store = store;
+        _hotkeys = hotkeys;
+        _pasteLast = pasteLast;
 
-        _search = Panels.SearchBox("Search snippets");
-        _search.TextChanged += (_, _) => Refresh();
+        _search = Panels.SearchBox("Search prompts and snippets");
+        _searchDebounce = new Debouncer(Tokens.Motion.SearchDebounce, Refresh);
+        _search.TextChanged += (_, _) => _searchDebounce.Trigger();
 
-        var add = Panels.PrimaryButton("New snippet");
+        var add = Panels.PrimaryButton("New prompt");
         add.Click += (_, _) => ShowEditor(null);
 
         _list = new StackPanel
         {
             Spacing = Tokens.Space.Snug,
-            Margin = new Thickness(Tokens.Space.Wide, Tokens.Space.Roomy),
+            Margin = new Thickness(Tokens.Space.Section, Tokens.Space.Tight, Tokens.Space.Section, Tokens.Space.Roomy),
         };
 
         _count = new Caption();
@@ -57,13 +76,24 @@ public sealed class SnippetsView : UserControl
         };
 
         _store.Changed += (_, _) => Refresh();
+
+        // Statuses are recomputed on whichever thread changed the store; the list is rebuilt on
+        // the UI thread either way.
+        if (_hotkeys is not null)
+        {
+            _hotkeys.Changed += (_, _) =>
+            {
+                if (Dispatcher.UIThread.CheckAccess()) Refresh();
+                else Dispatcher.UIThread.Post(Refresh);
+            };
+        }
+
         Refresh();
     }
 
     private static Caption Hint() => new()
     {
-        Text = "Say the trigger anywhere in a dictation",
-        Foreground = Tokens.Brushes.InkFaint,
+        Text = "Say a prompt's trigger on its own, or a snippet's anywhere",
         VerticalAlignment = VerticalAlignment.Center,
     };
 
@@ -72,20 +102,33 @@ public sealed class SnippetsView : UserControl
         var entries = _store.Search(_search.Text ?? string.Empty);
 
         _list.Children.Clear();
-        _count.Text = _store.Entries.Count == 1 ? "1 snippet" : $"{_store.Entries.Count} snippets";
+        _count.Text = CountText(_store.Entries);
 
         if (entries.Count == 0)
         {
             _list.Children.Add(Panels.EmptyState(
-                _store.Entries.Count == 0 ? "No snippets yet" : "No matches",
+                _store.Entries.Count == 0 ? "No prompts or snippets yet" : "No matches",
                 _store.Entries.Count == 0
-                    ? "Store a block of text behind a spoken phrase — an address, a signature, "
-                    + "a standard reply — and say the phrase to type all of it."
+                    ? "Save a prompt you use every day and say its name to paste all of it, or "
+                    + "give it a shortcut. Snippets put an address or a signature mid-sentence."
                     : "Try a different search."));
             return;
         }
 
         foreach (var entry in entries) _list.Children.Add(BuildRow(entry));
+    }
+
+    /// <summary>"2 prompts · 1 snippet", leaving out a kind there are none of.</summary>
+    internal static string CountText(IReadOnlyList<SnippetEntry> entries)
+    {
+        var prompts = entries.Count(e => e.Match == SnippetMatch.WholeUtterance);
+        var snippets = entries.Count - prompts;
+
+        var parts = new List<string>(2);
+        if (prompts > 0) parts.Add(prompts == 1 ? "1 prompt" : $"{prompts} prompts");
+        if (snippets > 0) parts.Add(snippets == 1 ? "1 snippet" : $"{snippets} snippets");
+
+        return parts.Count == 0 ? "Nothing saved yet" : string.Join(" · ", parts);
     }
 
     private Border BuildRow(SnippetEntry entry)
@@ -117,15 +160,15 @@ public sealed class SnippetsView : UserControl
             VerticalAlignment = VerticalAlignment.Center,
             Children =
             {
-                Panels.Chip("Say", Tokens.Colors.Accent),
+                Panels.Chip(entry.Match == SnippetMatch.WholeUtterance ? "Say only" : "Say", accent: true),
                 new TextBlock
                 {
                     Text = entry.Trigger,
                     FontFamily = Tokens.Fonts.Ui,
                     FontSize = Tokens.Fonts.Body,
                     FontWeight = FontWeight.SemiBold,
-                    Foreground = Tokens.Brushes.Ink,
                     VerticalAlignment = VerticalAlignment.Center,
+                    [!TextBlock.ForegroundProperty] = Tokens.Live.Ink,
                 },
                 new Caption
                 {
@@ -134,6 +177,11 @@ public sealed class SnippetsView : UserControl
                 },
             },
         };
+
+        if (entry.Hotkey is { } chord)
+        {
+            heading.Children.Insert(2, Panels.Chip(HotkeyChords.Format(chord)));
+        }
 
         var body = new StackPanel
         {
@@ -146,11 +194,17 @@ public sealed class SnippetsView : UserControl
                     Text = entry.Preview(),
                     FontFamily = Tokens.Fonts.Ui,
                     FontSize = Tokens.Fonts.Label,
-                    Foreground = Tokens.Brushes.InkMuted,
                     TextWrapping = TextWrapping.Wrap,
+                    [!TextBlock.ForegroundProperty] = Tokens.Live.InkMuted,
                 },
             },
         };
+
+        var status = _hotkeys?.StatusOf(entry.Id) ?? SnippetHotkeyStatus.None;
+        if (entry.IsEnabled && SnippetHotkeyBinder.Describe(status, entry.Hotkey) is { } problem)
+        {
+            body.Children.Add(Panels.Notice(problem));
+        }
 
         var card = Panels.Card(body);
         card.Padding = new Thickness(Tokens.Space.Roomy, Tokens.Space.Base);
@@ -166,7 +220,7 @@ public sealed class SnippetsView : UserControl
     {
         if (TopLevel.GetTopLevel(this) is not Window owner) return;
 
-        var editor = new SnippetEditorWindow(entry);
+        var editor = new SnippetEditorWindow(entry, _hotkeys, _pasteLast);
         editor.Saved += (_, saved) =>
         {
             if (entry is null) _store.Add(saved); else _store.Update(saved);
@@ -176,11 +230,18 @@ public sealed class SnippetsView : UserControl
     }
 }
 
-/// <summary>Add or edit one snippet, with the trigger warnings shown live.</summary>
+/// <summary>Add or edit one prompt or snippet, with the trigger warnings shown live.</summary>
 public sealed class SnippetEditorWindow : Window
 {
     private readonly TextBox _trigger;
     private readonly TextBox _text;
+    private readonly ToggleSwitch _wholeUtterance;
+    private readonly ShortcutRecorder _shortcut;
+    private readonly StackPanel _shortcutProblems;
+    private readonly SoftButton _suggestion;
+    private readonly SnippetHotkeyBinder? _hotkeys;
+    private SnippetHotkeyStatus _shortcutStatus;
+    private HotkeyChord? _suggested;
     private readonly StackPanel _warnings;
     private readonly Caption _length;
     private readonly SoftButton _save;
@@ -190,19 +251,28 @@ public sealed class SnippetEditorWindow : Window
     /// <summary>Raised when the user saves.</summary>
     public event EventHandler<SnippetEntry>? Saved;
 
-    /// <summary>Creates the editor for a new or existing snippet.</summary>
-    /// <param name="entry">The snippet to edit, or null for a new one.</param>
-    public SnippetEditorWindow(SnippetEntry? entry)
+    /// <summary>Creates the editor for a new or existing prompt or snippet.</summary>
+    /// <param name="entry">The entry to edit, or null for a new prompt.</param>
+    /// <param name="hotkeys">Checks a shortcut as it is recorded; null where shortcuts are unavailable.</param>
+    /// <param name="pasteLast">
+    /// The paste-last shortcut, given back too while a shortcut is recorded; null where there is none.
+    /// </param>
+    /// <remarks>
+    /// A new entry starts as a prompt — said on its own, pasted verbatim — because that is what
+    /// most people save. An existing entry keeps whatever it was.
+    /// </remarks>
+    public SnippetEditorWindow(SnippetEntry? entry, SnippetHotkeyBinder? hotkeys = null, PasteLastTranscript? pasteLast = null)
     {
         _id = entry?.Id ?? Guid.NewGuid();
         _wasEnabled = entry?.IsEnabled ?? true;
+        _hotkeys = hotkeys;
 
-        Title = entry is null ? "New snippet" : "Edit snippet";
+        Title = entry is null ? "New prompt" : "Edit prompt or snippet";
         Width = 540;
-        Height = 520;
+        Height = 680;
         CanResize = false;
-        Background = Tokens.Brushes.Canvas;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        Bind(BackgroundProperty, Tokens.Live.Canvas);
 
         _trigger = Panels.Field("my address", entry?.Trigger ?? string.Empty);
 
@@ -217,8 +287,32 @@ public sealed class SnippetEditorWindow : Window
         _length = new Caption();
         _warnings = new StackPanel { Spacing = Tokens.Space.Snug };
 
+        _wholeUtterance = new ToggleSwitch
+        {
+            IsChecked = (entry?.Match ?? SnippetMatch.WholeUtterance) == SnippetMatch.WholeUtterance,
+            OnContent = "On",
+            OffContent = "Off",
+            MinWidth = 0,
+        };
+
+        // Every combination Murmur holds is given back while recording, the paste-last one too:
+        // Windows would otherwise swallow it and paste the last transcript into this editor.
+        _shortcut = new ShortcutRecorder(
+            entry?.Hotkey, hotkeys is null ? null : () => ShortcutSuspension.All(hotkeys, pasteLast));
+        _shortcutProblems = new StackPanel { Spacing = Tokens.Space.Snug };
+
+        _suggestion = Panels.QuietButton(string.Empty);
+        _suggestion.HorizontalAlignment = HorizontalAlignment.Left;
+        _suggestion.Click += (_, _) => _shortcut.Chord = _suggested;
+
         _trigger.TextChanged += (_, _) => Revalidate();
         _text.TextChanged += (_, _) => Revalidate();
+        _wholeUtterance.IsCheckedChanged += (_, _) => Revalidate();
+        _shortcut.ChordChanged += (_, _) =>
+        {
+            RecheckShortcut();
+            Revalidate();
+        };
 
         var cancel = Panels.OutlineButton("Cancel");
         cancel.Click += (_, _) => Close();
@@ -232,19 +326,61 @@ public sealed class SnippetEditorWindow : Window
         };
 
         Content = BuildContent(cancel);
+        RecheckShortcut();
         Revalidate();
     }
 
-    private SnippetEntry Draft => new()
+    /// <summary>The entry as the fields currently describe it.</summary>
+    public SnippetEntry Draft => new()
     {
         Id = _id,
         Trigger = (_trigger.Text ?? string.Empty).Trim(),
         Text = _text.Text ?? string.Empty,
         IsEnabled = _wasEnabled,
+        Match = _wholeUtterance.IsChecked == true ? SnippetMatch.WholeUtterance : SnippetMatch.Inline,
+        Hotkey = _shortcut.Chord,
     };
 
+    /// <summary>The shortcut field.</summary>
+    public ShortcutRecorder Shortcut => _shortcut;
+
+    /// <summary>The "Say only this" switch.</summary>
+    public ToggleSwitch WholeUtterance => _wholeUtterance;
+
+    /// <summary>The free Ctrl+Alt+digit offered while there is no shortcut, or null.</summary>
+    public HotkeyChord? SuggestedShortcut => _suggestion.IsVisible ? _suggested : null;
+
+    /// <summary>The button that takes <see cref="SuggestedShortcut"/>.</summary>
+    public SoftButton Suggestion => _suggestion;
+
     private bool IsValid =>
-        Draft.Trigger.Length >= SnippetExpander.MinTriggerLength && Draft.Text.Trim().Length > 0;
+        Draft.Trigger.Length >= SnippetExpander.MinTriggerLength && Draft.Text.Trim().Length > 0
+        && _shortcutStatus is not (SnippetHotkeyStatus.Invalid or SnippetHotkeyStatus.Duplicate or SnippetHotkeyStatus.PasteLast);
+
+    /// <summary>Checks the recorded shortcut, or finds one to suggest when there is none.</summary>
+    /// <remarks>
+    /// <para>
+    /// Only when the shortcut changes, not on every keystroke in the other fields: a check
+    /// briefly registers the combination system-wide and waits on the hotkey thread to do it.
+    /// </para>
+    /// <para>
+    /// A combination that cannot work, or that another prompt already has, blocks saving. One
+    /// another app holds is allowed with a warning: that app may well be closed by the time it
+    /// matters, and the list keeps saying so until it is.
+    /// </para>
+    /// </remarks>
+    private void RecheckShortcut()
+    {
+        _shortcutStatus = _shortcut.Chord is not { } chord
+            ? SnippetHotkeyStatus.None
+            : HotkeyChords.Problem(chord) is not null
+                ? SnippetHotkeyStatus.Invalid
+                : _hotkeys?.Check(chord, _id) ?? SnippetHotkeyStatus.Active;
+
+        _suggested = _shortcut.Chord is null ? _hotkeys?.Suggest(_id) : null;
+        _suggestion.IsVisible = _suggested is not null;
+        _suggestion.Content = _suggested is { } suggested ? $"Use {HotkeyChords.Format(suggested)}" : null;
+    }
 
     private ScrollViewer BuildContent(Control cancel) => new()
     {
@@ -266,13 +402,38 @@ public sealed class SnippetEditorWindow : Window
                             Children =
                             {
                                 Panels.Docked(_length, Dock.Right),
-                                new Caption { Text = "Type this", IsHeader = true },
+                                Panels.FieldLabel("Paste this"),
                             },
                         },
                         _text,
                     },
                 },
+                new DockPanel
+                {
+                    LastChildFill = true,
+                    Children =
+                    {
+                        Panels.Docked(_wholeUtterance, Dock.Right),
+                        new TextBlock
+                        {
+                            Text = "Say only this — paste it exactly as written",
+                            FontFamily = Tokens.Fonts.Ui,
+                            FontSize = Tokens.Fonts.Body,
+                            TextWrapping = TextWrapping.Wrap,
+                            VerticalAlignment = VerticalAlignment.Center,
+                            [!TextBlock.ForegroundProperty] = Tokens.Live.Ink,
+                        },
+                    },
+                },
+                Panels.Note("On: the trigger has to be all you say, and the text is pasted with "
+                          + "every line break kept. Off: it expands wherever you say it, like a "
+                          + "signature mid-sentence."),
                 _warnings,
+                Panels.Labelled("Shortcut (optional)", _shortcut),
+                _suggestion,
+                Panels.Note("Pastes it without speaking. Ctrl+Alt and a number is easy to reach "
+                          + "with one hand."),
+                _shortcutProblems,
                 new StackPanel
                 {
                     Orientation = Orientation.Horizontal,
@@ -294,6 +455,12 @@ public sealed class SnippetEditorWindow : Window
         foreach (var warning in SnippetWarning.Check(draft))
         {
             _warnings.Children.Add(Panels.Notice(warning.Message));
+        }
+
+        _shortcutProblems.Children.Clear();
+        if (SnippetHotkeyBinder.Describe(_shortcutStatus, draft.Hotkey) is { } problem)
+        {
+            _shortcutProblems.Children.Add(Panels.Notice(problem));
         }
 
         _save.IsEnabled = IsValid;

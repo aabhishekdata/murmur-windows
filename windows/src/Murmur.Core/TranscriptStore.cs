@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Murmur.Abstractions;
 using Murmur.Dictionary;
 
 namespace Murmur.Core;
@@ -24,6 +25,27 @@ public sealed record TranscriptRecord
 
     /// <summary>Corrections that fired, if any.</summary>
     public IReadOnlyList<AppliedCorrection>? Corrections { get; init; }
+
+    // The fields below arrived later. Each is left out of the line when it holds its default, so
+    // a record that says nothing new reads exactly as it was written, and a history written
+    // before they existed loads with "unknown engine, did not fall back, not a retry".
+
+    /// <summary>The engine that heard it; <see cref="TranscriberKind.Unknown"/> in older history.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public TranscriberKind Engine { get; init; }
+
+    /// <summary>Whether the fallback engine heard it rather than the one chosen.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool FellBack { get; init; }
+
+    /// <summary>The cloud profile in use when Azure heard it; null for Parakeet and older history.</summary>
+    /// <remarks>What Home's cost estimate prices the minutes at.</remarks>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public CloudProfile? Profile { get; init; }
+
+    /// <summary>The record this one replaced by retrying with the other engine, or null.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Guid? RetriedFrom { get; init; }
 }
 
 /// <summary>
@@ -53,12 +75,13 @@ public sealed class TranscriptStore
     }
 
     /// <summary>The default location.</summary>
-    public static string DefaultPath => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "Murmur", "transcripts.jsonl");
+    public static string DefaultPath => MurmurPaths.In("transcripts.jsonl");
 
     /// <summary>Every record, newest first.</summary>
     public IReadOnlyList<TranscriptRecord> Records => _records;
+
+    /// <summary>The newest record, or null when there are none.</summary>
+    public TranscriptRecord? Latest => _records.Count > 0 ? _records[0] : null;
 
     /// <summary>Raised whenever the history changes.</summary>
     public event EventHandler? Changed;
@@ -102,6 +125,27 @@ public sealed class TranscriptStore
 
         _records.Insert(0, record);
         Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Puts <paramref name="replacement"/> where the record <paramref name="id"/> was.</summary>
+    /// <param name="id">The record being replaced.</param>
+    /// <param name="replacement">What takes its place, keeping its position in the list.</param>
+    /// <returns>False when there is no such record; nothing is changed then.</returns>
+    /// <remarks>
+    /// For a retry: the new transcript stands where the old one did, rather than jumping to the top
+    /// as a dictation the user never made, and carries the old one's id in
+    /// <see cref="TranscriptRecord.RetriedFrom"/>.
+    /// </remarks>
+    public bool Replace(Guid id, TranscriptRecord replacement)
+    {
+        ArgumentNullException.ThrowIfNull(replacement);
+
+        var index = _records.FindIndex(r => r.Id == id);
+        if (index < 0) return false;
+
+        _records[index] = replacement;
+        Rewrite();
+        return true;
     }
 
     /// <summary>Deletes one record.</summary>

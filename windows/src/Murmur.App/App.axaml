@@ -5,9 +5,8 @@
   <!-- Default, not a fixed variant: the hub follows the system appearance. The floating bar
        does not — it is a dark object sitting on top of other people's windows, and it is dark
        in both themes on purpose. -->
-  <Application.Styles>
-    <FluentTheme />
-  </Application.Styles>
+  <!-- No Application.Styles here: the control theme is added in Initialize from
+       Design/AppTheme, which the headless tests install too. -->
 
   <!-- Third interface, after the floating bar and the hub. The bar can be hidden and the hub
        can be closed; the tray is what is always there. Avalonia's TrayIcon maps to the Windows
@@ -19,6 +18,7 @@
           <NativeMenu>
             <NativeMenuItem Header="Open Murmur" Click="OnTrayShow" />
             <NativeMenuItem Header="Show floating bar" Click="OnTrayBar" />
+            <NativeMenuItem Header="Copy last transcript" Click="OnTrayCopyLast" />
             <NativeMenuItem Header="Settings…" Click="OnTraySettings" />
             <NativeMenuItemSeparator />
             <NativeMenuItem Header="Quit" Click="OnTrayQuit" />

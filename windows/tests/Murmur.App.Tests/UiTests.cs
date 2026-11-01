@@ -4,7 +4,6 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Media;
-using Avalonia.Themes.Fluent;
 using Avalonia.VisualTree;
 using Murmur.Abstractions;
 using Murmur.App.Controls;
@@ -46,11 +45,13 @@ public sealed class TestApp : Application
     /// <inheritdoc />
     public override void Initialize()
     {
-        Styles.Add(new FluentTheme());
+        // The app's own theme, not a stand-in: a preview is only a review if it is drawn the way
+        // the shipped app is.
+        Styles.Add(AppTheme.Create());
 
         // The same accent override the real app installs, so a rendered preview is a picture
         // of the shipped interface rather than of a Windows-blue approximation of it.
-        AccentResources.Apply(this);
+        ThemeResources.Install(this, PlatformSettings);
     }
 }
 
@@ -82,7 +83,7 @@ public sealed class FlowBarTests
         // taskbar button for a floating pill is simply wrong.
         var bar = new FlowBarWindow();
 
-        bar.SystemDecorations.ShouldBe(SystemDecorations.None);
+        bar.WindowDecorations.ShouldBe(WindowDecorations.None);
         bar.Topmost.ShouldBeTrue();
         bar.ShowInTaskbar.ShouldBeFalse();
         bar.CanResize.ShouldBeFalse();
@@ -141,18 +142,36 @@ public sealed class FlowBarTests
     }
 
     [AvaloniaFact]
-    public void Processing_swaps_the_level_bars_for_the_pulse()
+    public void Processing_swaps_the_level_bars_for_a_word()
     {
         // Leaving the level bars up while transcribing tells the user it is still listening,
-        // which is exactly when they start talking into a microphone that has stopped.
+        // which is exactly when they start talking into a microphone that has stopped. A word,
+        // not a spinner: nothing on the bar loops.
         var bar = new FlowBarWindow();
         bar.Show();
 
         bar.ApplyState(BarState.Processing);
         bar.Wave.IsVisible.ShouldBeFalse();
+        bar.Label.ShouldBe("Transcribing");
 
         bar.ApplyState(BarState.Listening);
         bar.Wave.IsVisible.ShouldBeTrue();
+        bar.Label.ShouldBeEmpty();
+    }
+
+    [AvaloniaFact]
+    public void Level_bars_show_only_while_recording()
+    {
+        var bar = new FlowBarWindow();
+        bar.Show();
+
+        foreach (var state in Enum.GetValues<BarState>())
+        {
+            bar.ApplyState(state);
+            var recording = state is BarState.Listening or BarState.HandsFree;
+            bar.Wave.IsVisible.ShouldBe(recording, $"{state}");
+            bar.Cancel.IsVisible.ShouldBe(recording, $"{state}");
+        }
     }
 
     [AvaloniaFact]
@@ -200,6 +219,9 @@ public sealed class FlowBarTests
         {
             var settings = new AppSettings(path);
             settings.Update(settings.Data with { FlowBarEdge = ScreenEdge.Right, FlowBarOffset = 0.25 });
+
+            // Writes are debounced; shutdown flushes, and so does this "restart".
+            settings.Flush();
 
             var reopened = new AppSettings(path);
             reopened.Data.FlowBarEdge.ShouldBe(ScreenEdge.Right);
@@ -365,7 +387,7 @@ public sealed class FeatureViewTests
             var window = new Window { Width = 700, Height = 500, Content = view };
             window.Show();
 
-            Shows(view, "No snippets yet").ShouldBeTrue();
+            Shows(view, "No prompts or snippets yet").ShouldBeTrue();
         }
         finally
         {
@@ -520,6 +542,7 @@ public sealed class FeatureViewTests
             dismiss.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
 
             view.IsVisible.ShouldBeFalse("a rejected suggestion must not come straight back");
+            settings.Flush();
             new AppSettings(settingsPath).Data.DismissedSuggestions.ShouldNotBeEmpty(
                 "and it must still be gone after a restart");
         }
@@ -547,7 +570,7 @@ public sealed class FeatureViewTests
         // what answers "does this rule do anything?" before the next dictation rather than
         // after it.
         var hear = teach.GetVisualDescendants().OfType<TextBox>()
-            .First(t => t.Watermark == "what it heard");
+            .First(t => t.PlaceholderText == "what it heard");
 
         hear.Text = "cloud code";
         Avalonia.Threading.Dispatcher.UIThread.RunJobs();
@@ -574,9 +597,12 @@ public sealed class FeatureViewTests
             var window = new Window { Width = 700, Height = 900, Content = view };
             window.Show();
 
-            Shows(view, "System default").ShouldBeTrue("the fallback is always offered, and first");
-            Shows(view, "Headset Microphone").ShouldBeTrue();
-            Shows(view, "Webcam Array").ShouldBeTrue();
+            // A combo box, not a column of rows: the choices are its items.
+            view.MicrophoneChoices[0].StartsWith("System default", StringComparison.Ordinal).ShouldBeTrue("the fallback is always offered, and first");
+            view.MicrophoneChoices.ShouldContain("Headset Microphone");
+            view.MicrophoneChoices.ShouldContain("Webcam Array");
+            Shows(view, "System default").ShouldBeTrue("the current choice is on show");
+            Shows(view, "The system default is Headset Microphone.").ShouldBeTrue("which device that is right now");
         }
         finally
         {
@@ -621,7 +647,7 @@ public sealed class FeatureViewTests
             Shows(view, "filler words").ShouldBeTrue();
             Shows(view, "wait no").ShouldBeTrue();
             Shows(view, "spoken lists").ShouldBeTrue();
-            Shows(view, "snippet triggers").ShouldBeTrue();
+            Shows(view, "prompts and snippets").ShouldBeTrue();
             Shows(view, "press enter").ShouldBeTrue();
         }
         finally
@@ -716,57 +742,47 @@ public sealed class ControlTests
     }
 
     [AvaloniaFact]
-    public void A_navigation_row_recolours_when_selected()
+    public void A_primary_button_is_Fluents_accent_button()
     {
-        var nav = new NavItem("⌂", "Home");
-        var window = new Window { Content = nav };
-        window.Show();
-
-        nav.IsSelected.ShouldBeFalse();
-        nav.IsSelected = true;
-        nav.IsSelected.ShouldBeTrue();
-
-        nav.Bounds.Height.ShouldBeGreaterThan(0);
-    }
-
-    [AvaloniaFact]
-    public void A_primary_button_writes_on_the_accent()
-    {
+        // Drawn by the Fluent theme's accent style — which follows the accent live — rather than
+        // painted by hand.
         var button = new SoftButton { Content = "Save", Tone = ButtonTone.Primary };
         var window = new Window { Content = button };
         window.Show();
 
-        ((SolidColorBrush)button.Foreground!).Color.ShouldBe(Tokens.Colors.OnAccent);
+        button.Classes.ShouldContain("accent");
+
+        button.Tone = ButtonTone.Outline;
+        button.Classes.ShouldNotContain("accent");
     }
 
     [AvaloniaFact]
-    public void A_disabled_button_actually_looks_disabled()
+    public void A_disabled_button_gets_the_themes_disabled_state()
     {
-        // SoftButton draws itself, so the Fluent theme's disabled visual state never reaches
-        // it. Without an explicit fade, a dead "Delete all" is indistinguishable from a live
-        // one — the user clicks it and nothing happens.
+        // The Fluent template draws the disabled look from the :disabled pseudo-class. A button
+        // that drew itself used to have to fade by hand, or a dead "Delete all" looked live.
         var button = new SoftButton { Content = "Delete all" };
         var window = new Window { Content = button };
         window.Show();
 
-        button.Opacity.ShouldBe(1);
+        button.Classes.ShouldNotContain(":disabled");
 
         button.IsEnabled = false;
-        button.Opacity.ShouldBeLessThan(1);
-
-        button.IsEnabled = true;
-        button.Opacity.ShouldBe(1);
+        button.Classes.ShouldContain(":disabled");
+        button.GetVisualDescendants().ShouldNotBeEmpty("the Fluent template must be applied to the subclass");
     }
 
     [AvaloniaFact]
-    public void The_pulse_dots_measure_to_their_geometry()
+    public void A_button_with_an_icon_keeps_its_label()
     {
-        var dots = new PulseDots();
-        dots.Measure(new Size(100, 12));
+        var button = new SoftButton { Content = "Test connection", Icon = Icons.PlugConnected };
+        var window = new Window { Content = button };
+        window.Show();
 
-        var expected = (PulseDots.Count * PulseDots.DotSize) + ((PulseDots.Count - 1) * PulseDots.Gap);
-        dots.DesiredSize.Width.ShouldBe(expected);
+        button.Label.ShouldBe("Test connection");
+        button.GetVisualDescendants().OfType<FluentIcon>().ShouldHaveSingleItem().Data.ShouldBe(Icons.PlugConnected);
     }
+
 }
 
 /// <summary>
@@ -814,13 +830,13 @@ public sealed class DesignSystemTests
     }
 
     [AvaloniaFact]
-    public void Radii_are_soft_enough_to_read_as_software()
+    public void Radii_are_Windows_11s()
     {
-        // The inverse of the rule the retired design held. Hard edges read as equipment, and
-        // this design is deliberately not a machine.
-        Tokens.Radius.Chip.ShouldBeGreaterThanOrEqualTo(4);
-        Tokens.Radius.Control.ShouldBeGreaterThanOrEqualTo(8);
-        Tokens.Radius.Card.ShouldBeGreaterThanOrEqualTo(12);
+        // ControlCornerRadius and OverlayCornerRadius. A card at 13 beside a FluentAvalonia
+        // expander at 8 is how a Windows window starts to look like a web page.
+        Tokens.Radius.Control.ShouldBe(4);
+        Tokens.Radius.Card.ShouldBe(8);
+        Tokens.Radius.Chip.ShouldBeLessThanOrEqualTo(Tokens.Radius.Control);
         Tokens.Radius.Pill.ShouldBeGreaterThan(Tokens.Bar.Height);
     }
 
@@ -856,11 +872,12 @@ public sealed class DesignSystemTests
     }
 
     [AvaloniaFact]
-    public void The_ui_polls_the_engine_far_below_frame_rate()
+    public void Animations_repaint_at_most_thirty_times_a_second()
     {
-        // The engine raises Changed on a background thread at buffer rate. Marshalling every
-        // one of those to the UI thread would be far more traffic than a display needs.
-        Tokens.Motion.Poll.ShouldBeGreaterThan(Tokens.Motion.Frame);
+        // The physics step at 60 Hz so the tuned smoothing still holds, but painting is capped:
+        // every repaint of an always-on-top window is a composition the whole desktop pays for.
+        Tokens.Motion.FrameCap.ShouldBeGreaterThan(Tokens.Motion.Frame);
+        Tokens.Motion.FrameCap.ShouldBeGreaterThanOrEqualTo(Tokens.Motion.Frame * 2);
     }
 
     private static double Luminance(Color colour)

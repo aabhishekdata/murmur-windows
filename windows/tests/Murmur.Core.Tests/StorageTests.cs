@@ -224,6 +224,7 @@ public sealed class AppSettingsTests : IDisposable
     {
         var settings = new AppSettings(_path);
         settings.Update(settings.Data with { PushToTalkKey = 0x7C, InjectText = false });
+        settings.Flush();
 
         var reopened = new AppSettings(_path);
         reopened.Data.PushToTalkKey.ShouldBe(0x7C);

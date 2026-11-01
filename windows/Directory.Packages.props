@@ -19,20 +19,31 @@
     <PackageVersion Include="NAudio" Version="2.3.0" />
 
     <!-- UI. Avalonia rather than WPF: it is the only option that builds, runs and
-         UI-tests on macOS, which is where this app is being written. -->
-    <PackageVersion Include="Avalonia" Version="11.3.20" />
-    <PackageVersion Include="Avalonia.Desktop" Version="11.3.20" />
-    <PackageVersion Include="Avalonia.Themes.Fluent" Version="11.3.20" />
-    <PackageVersion Include="Avalonia.Fonts.Inter" Version="11.3.20" />
-    <PackageVersion Include="Avalonia.Skia" Version="11.3.20" />
-    <PackageVersion Include="Avalonia.Diagnostics" Version="11.3.20" />
-    <PackageVersion Include="Avalonia.Headless" Version="11.3.20" />
-    <!-- Avalonia.Headless.XUnit 12.x requires xUnit *v3*, a different package line.
-         11.3.x pairs with xUnit v2, which is what is referenced below. -->
-    <PackageVersion Include="Avalonia.Headless.XUnit" Version="11.3.20" />
+         UI-tests on macOS, which is where this app is being written.
+         12.x, not 11.x: the 11 render loop ticks forever even when nothing is animating
+         (issue #7608); 12.0 lets it sleep when idle (PR #20873), which is most of the idle
+         CPU this app had left. Every Avalonia package moves together — mixing 11 and 12
+         assemblies fails at run time, not at build time. Avalonia.Diagnostics has no 12.x
+         release (the dev tools moved out of the package) and is no longer referenced. -->
+    <PackageVersion Include="Avalonia" Version="12.1.4" />
+    <PackageVersion Include="Avalonia.Desktop" Version="12.1.4" />
+    <PackageVersion Include="Avalonia.Fonts.Inter" Version="12.1.4" />
+    <PackageVersion Include="Avalonia.Skia" Version="12.1.4" />
+    <PackageVersion Include="Avalonia.Headless" Version="12.1.4" />
+    <!-- Windows 11 Fluent controls (NavigationView, SettingsExpander, InfoBar…) and the theme
+         that styles the stock controls to match. 3.1 is the first line built for Avalonia
+         12.1; it pulls DataGrid and ColorPicker in with it. -->
+    <PackageVersion Include="FluentAvaloniaUI" Version="3.1.0" />
+    <!-- Avalonia.Headless.XUnit 12.x is built on xUnit *v3* (xunit.v3.extensibility.core
+         >= 3.2.2), which is why the tests below are on the v3 package line. -->
+    <PackageVersion Include="Avalonia.Headless.XUnit" Version="12.1.4" />
 
-    <!-- Testing. Not FluentAssertions: 8.x is commercially licensed (~$130/dev/yr). -->
-    <PackageVersion Include="xunit" Version="2.9.3" />
+    <!-- Testing. Not FluentAssertions: 8.x is commercially licensed (~$130/dev/yr).
+         xunit.v3 3.2.x rather than 4.x: Headless.XUnit 12 is compiled against the 3.x
+         extensibility API, and 4.0 is a major version of that API. Test projects are
+         executables under v3 (OutputType Exe); xunit.runner.visualstudio 3.x is what lets
+         `dotnet test` and VSTest drive them. -->
+    <PackageVersion Include="xunit.v3" Version="3.2.2" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageVersion Include="Shouldly" Version="4.3.0" />

@@ -4,6 +4,7 @@ using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using Avalonia.Styling;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -15,40 +16,185 @@ using Murmur.App.Views;
 using Murmur.Core;
 using Murmur.Testing;
 using Shouldly;
+using Xunit;
 
 namespace Murmur.AppTests;
 
 /// <summary>
-/// Renders the redesigned interface to PNG files so it can actually be looked at.
+/// Renders the interface to PNG files so it can actually be looked at — every screen in the
+/// light, dark and high-contrast palettes.
 /// </summary>
 /// <remarks>
 /// <para>
-/// This app is written on Linux and runs on Windows, and the one thing a unit test cannot
-/// assert about a redesign is whether it looks right. Skia rasterises the real visual tree
-/// headlessly, so every screen and every state can be captured on the machine that wrote it —
-/// including states that are awkward to reach by hand, like the missing-model banner or a
-/// history full of transcripts.
+/// The one thing a unit test cannot assert about a redesign is whether it looks right. Skia
+/// rasterises the real visual tree headlessly, so every screen and every state can be captured
+/// on the machine that wrote it — including states that are awkward to reach by hand, like the
+/// missing-model notice or each step of first-run setup.
+/// </para>
+/// <para>
+/// A headless window has no compositor, so it is never granted Mica: these show the solid
+/// fallback a window gets when transparency is refused, which is also exactly what high contrast
+/// draws. The <c>mica</c> captures stand a flat wallpaper-tinted colour behind a transparent
+/// window to show the material case.
 /// </para>
 /// <para>
 /// They are tests rather than a separate tool on purpose: a preview generator that is not part
-/// of the suite stops being run, and then stops compiling. These also assert what they capture
-/// is non-empty, so a screen that renders blank fails the build rather than producing a white
-/// rectangle nobody notices.
-/// </para>
-/// <para>
-/// Output goes to <c>artifacts/ui-preview/</c> beside the solution.
+/// of the suite stops being run, and then stops compiling. Each also asserts what it captured is
+/// non-empty, so a screen that renders blank fails the build rather than producing a white
+/// rectangle nobody notices. Output goes to <c>artifacts/ui-preview/</c> beside the solution.
 /// </para>
 /// </remarks>
 public sealed class PreviewRenderTests
 {
+    // ---- The hub ----
+
+    [AvaloniaTheory]
+    [InlineData("light")]
+    [InlineData("dark")]
+    [InlineData("hc")]
+    public void The_hub_pages_are_captured(string theme) => InTheme(theme, () =>
+    {
+        using var scratch = new Scratch();
+        var composition = scratch.Compose(Seed(), dictionary: DictionarySeed(), snippets: SnippetSeed());
+
+        foreach (var (section, name) in new[]
+        {
+            (HubSection.Home, "hub-1-home"),
+            (HubSection.History, "hub-2-history"),
+            (HubSection.Dictionary, "hub-3-dictionary"),
+            (HubSection.Snippets, "hub-4-prompts"),
+        })
+        {
+            var hub = new HubWindow(composition);
+            hub.ShowSection(section);
+            CaptureWindow(hub, $"{name}-{theme}");
+            hub.Close();
+        }
+    });
+
+    [AvaloniaTheory]
+    [InlineData("light")]
+    [InlineData("dark")]
+    [InlineData("hc")]
+    public void The_empty_hub_is_captured(string theme) => InTheme(theme, () =>
+    {
+        using var scratch = new Scratch();
+        var composition = scratch.Compose([]);
+
+        var hub = new HubWindow(composition);
+        hub.ShowSection(HubSection.Home);
+        CaptureWindow(hub, $"hub-5-home-empty-{theme}");
+    });
+
+    [AvaloniaTheory]
+    [InlineData("light")]
+    [InlineData("dark")]
+    public void The_hub_is_captured_over_a_material(string theme) => InTheme(theme, () =>
+    {
+        // Mica is the wallpaper, heavily blurred and tinted by the theme. A flat tint behind a
+        // transparent window is a fair stand-in for reviewing how the layer and the pane sit on it.
+        using var scratch = new Scratch();
+        var composition = scratch.Compose(Seed(), dictionary: DictionarySeed());
+
+        var hub = new HubWindow(composition);
+        hub.ShowSection(HubSection.Home);
+        hub.Show();
+        hub.Background = new SolidColorBrush(theme == "dark" ? Color.FromRgb(0x20, 0x22, 0x2B) : Color.FromRgb(0xEC, 0xEE, 0xF5));
+
+        Save(hub, $"hub-6-home-mica-{theme}");
+    });
+
+    [AvaloniaTheory]
+    [InlineData("light")]
+    [InlineData("dark")]
+    [InlineData("hc")]
+    public void Every_settings_group_is_captured(string theme) => InTheme(theme, () =>
+    {
+        using var scratch = new Scratch();
+        var composition = scratch.Compose([], microphones: new FakeAudioDeviceCatalog(
+            new AudioDeviceInfo("{headset}", "Headset Microphone (Jabra Evolve2)", IsDefault: true),
+            new AudioDeviceInfo("{array}", "Microphone Array (Realtek Audio)", IsDefault: false)));
+        composition.Settings.Update(composition.Settings.Data with
+        {
+            AzureEndpoint = "https://contoso-speech.openai.azure.com",
+            AzureDeploymentAccurate = "gpt-4o-transcribe",
+        });
+
+        var hub = new HubWindow(composition) { Height = 820 };
+        hub.ShowSection(HubSection.Settings);
+        hub.Show();
+        Settle();
+
+        var view = hub.GetVisualDescendants().OfType<SettingsView>().Single();
+        var scroller = hub.GetVisualDescendants().OfType<ScrollViewer>().First(s => s.GetVisualDescendants().Contains(view));
+
+        for (var i = 0; i < view.Groups.Count; i++)
+        {
+            var group = view.Groups[i];
+            var top = group.TranslatePoint(new Point(0, 0), view) ?? default;
+            scroller.Offset = new Vector(0, Math.Max(0, top.Y - Tokens.Space.Base));
+
+            Save(hub, $"settings-{i + 1}-{GroupNames[i]}-{theme}");
+        }
+    });
+
+    private static readonly string[] GroupNames = ["general", "transcription", "cleanup", "prompts", "privacy", "about"];
+
     [AvaloniaFact]
-    public void The_floating_bar_is_captured_in_every_state()
+    public void The_standalone_settings_window_is_captured()
+    {
+        using var scratch = new Scratch();
+        var composition = scratch.Compose([]);
+
+        var window = new SettingsWindow(composition.Settings, composition.Microphones, composition.Cloud, composition.Models);
+        CaptureWindow(window, "settings-7-window-light");
+    }
+
+    // ---- Onboarding ----
+
+    [AvaloniaTheory]
+    [InlineData("light")]
+    [InlineData("dark")]
+    [InlineData("hc")]
+    public void Every_onboarding_step_is_captured(string theme) => InTheme(theme, () =>
+    {
+        using var scratch = new Scratch();
+        var composition = scratch.Compose([]);
+
+        foreach (var step in Enum.GetValues<OnboardingStep>())
+        {
+            if (step == OnboardingStep.Azure)
+            {
+                composition.Settings.Update(composition.Settings.Data with { Engine = EngineMode.AzureWithParakeetFallback });
+            }
+            else if (step == OnboardingStep.Offline)
+            {
+                composition.Settings.Update(composition.Settings.Data with { Engine = EngineMode.Parakeet });
+            }
+
+            var window = new OnboardingWindow(composition);
+            window.GoTo(step);
+
+            if (step == OnboardingStep.Hotkey) window.Heard("Hello.");
+
+            CaptureWindow(window, $"onboarding-{(int)step + 1}-{step.ToString().ToLowerInvariant()}-{theme}");
+            window.Close();
+        }
+    });
+
+    // ---- The floating bar ----
+
+    [AvaloniaTheory]
+    [InlineData("light")]
+    [InlineData("dark")]
+    [InlineData("hc")]
+    public void The_floating_bar_is_captured_in_every_state(string theme) => InTheme(theme, () =>
     {
         foreach (var (state, name) in new[]
         {
             (BarState.Idle, "bar-1-idle"),
-            (BarState.Listening, "bar-2-listening"),
-            (BarState.Processing, "bar-3-processing"),
+            (BarState.Listening, "bar-2-recording"),
+            (BarState.Processing, "bar-3-transcribing"),
             (BarState.Unavailable, "bar-4-no-model"),
         })
         {
@@ -63,9 +209,9 @@ public sealed class PreviewRenderTests
                 for (var i = 0; i < 40; i++) bar.Wave.Advance();
             }
 
-            CaptureContent(OnBackdrop(bar.Pill, bar.Width, bar.Height), name, 520, 180);
+            CaptureContent(OnDesktop(bar.Pill, bar.Width, bar.Height, theme), $"{name}-{theme}", 360, 140);
         }
-    }
+    });
 
     [AvaloniaFact]
     public void The_side_docked_bar_is_captured()
@@ -77,195 +223,107 @@ public sealed class PreviewRenderTests
         bar.Wave.Level = 0.24;
         for (var i = 0; i < 40; i++) bar.Wave.Advance();
 
-        CaptureContent(OnBackdrop(bar.Pill, bar.Width, bar.Height), "bar-5-docked-right", 320, 380);
+        CaptureContent(OnDesktop(bar.Pill, bar.Width, bar.Height, "light"), "bar-5-docked-right-light", 200, 300);
     }
 
-    [AvaloniaFact]
-    public void The_hub_is_captured_with_a_populated_history()
-    {
-        using var scratch = new Scratch();
-        var composition = scratch.Compose(Seed());
-
-        var hub = new HubWindow(composition);
-        hub.ShowSection(HubSection.Home);
-
-        CaptureWindow(hub, "hub-1-home");
-    }
-
-    [AvaloniaFact]
-    public void The_empty_hub_is_captured()
+    [AvaloniaTheory]
+    [InlineData("light")]
+    [InlineData("dark")]
+    [InlineData("hc")]
+    public void The_bars_hands_free_and_notice_states_are_captured(string theme) => InTheme(theme, () =>
     {
         using var scratch = new Scratch();
         var composition = scratch.Compose([]);
+        composition.Settings.Update(composition.Settings.Data with
+        {
+            Engine = EngineMode.AzureWithParakeetFallback,
+            AzureEndpoint = "https://contoso-speech.openai.azure.com",
+            AzureDeploymentAccurate = "gpt-4o-transcribe",
+        });
+        composition.Cloud.Key.Save("a1b2c3d4e5f60718293a4b5c6d7e8f90");
 
-        var hub = new HubWindow(composition);
-        hub.ShowSection(HubSection.Home);
+        var handsFree = new FlowBarWindow(composition);
+        handsFree.ApplyState(BarState.HandsFree);
+        handsFree.Wave.Level = 0.2;
+        for (var i = 0; i < 40; i++) handsFree.Wave.Advance();
+        CaptureContent(OnDesktop(handsFree.Pill, handsFree.Width, handsFree.Height, theme), $"bar-7-hands-free-{theme}", 460, 140);
 
-        CaptureWindow(hub, "hub-2-home-empty");
-    }
+        var fallback = new FlowBarWindow(composition);
+        fallback.ShowOutcome(TranscriberKind.Parakeet, fellBack: true);
+        fallback.ShowNotice(BarNotices.ForFallback(new TranscriptionFallback(
+            TranscriberKind.Azure, TranscriberKind.Parakeet, new HttpRequestException("offline"))), alert: false);
+        CaptureContent(OnDesktop(fallback.Pill, fallback.Width, fallback.Height, theme), $"bar-8-fallback-notice-{theme}", 460, 140);
+
+        var fault = new FlowBarWindow(composition);
+        fault.ShowNotice(BarNotices.ForFault(new TranscriptionException(
+            TranscriptionFailure.Unauthorized, "401")), alert: true);
+        CaptureContent(OnDesktop(fault.Pill, fault.Width, fault.Height, theme), $"bar-9-fault-notice-{theme}", 460, 140);
+
+        var badge = new FlowBarWindow(composition);
+        badge.ShowOutcome(TranscriberKind.Parakeet, fellBack: true);
+        CaptureContent(OnDesktop(badge.Pill, badge.Width, badge.Height, theme), $"bar-10-idle-fallback-badge-{theme}", 360, 140);
+    });
 
     [AvaloniaFact]
-    public void The_dictionary_section_is_captured()
+    public void History_with_its_row_actions_showing_is_captured()
     {
         using var scratch = new Scratch();
-        var composition = scratch.Compose([], dictionary:
-        [
-            "Anthropic",
-            "Vercel",
-            "cloud code -> Claude Code",
-            "whisper flow -> Wispr Flow",
-            "# off: para keet -> Parakeet",
-        ]);
+        var composition = scratch.Compose(Seed(), engines: kind => new ScriptedTranscriber(kind));
+        foreach (var record in composition.Transcripts.Records.Take(2)) composition.Audio.Add(record.Id, new float[1600]);
 
         var hub = new HubWindow(composition);
-        hub.ShowSection(HubSection.Dictionary);
+        hub.ShowSection(HubSection.History);
+        hub.Show();
+        Settle();
 
-        CaptureWindow(hub, "hub-3-dictionary");
+        // Hover reveals a row's actions; the first row stands in for the one under the pointer.
+        var paste = hub.GetVisualDescendants().OfType<SoftButton>().First(b => b.Label == "Paste");
+        if (paste.Parent is Control actions) actions.Opacity = 1;
+
+        Save(hub, "hub-7-history-actions-light");
     }
 
     [AvaloniaFact]
-    public void The_snippets_section_is_captured()
+    public void The_bar_with_the_cloud_badge_is_captured()
     {
         using var scratch = new Scratch();
-        var composition = scratch.Compose([], snippets:
-        [
-            new SnippetEntry
-            {
-                Trigger = "my address",
-                Text = "12 Bridge Street\nManchester M1 2AB\nUnited Kingdom",
-            },
-            new SnippetEntry
-            {
-                Trigger = "sign off",
-                Text = "Thanks for reading — shout if anything here needs another pass.\n\nPat",
-            },
-            new SnippetEntry
-            {
-                Trigger = "stand up",
-                Text = "Yesterday: shipped the floating bar. Today: snippets and the "
-                     + "microphone picker. Blockers: none.",
-            },
-            new SnippetEntry
-            {
-                Trigger = "office hours",
-                Text = "I'm around 9 to 5 UK time, Monday to Thursday.",
-                IsEnabled = false,
-            },
-        ]);
+        var composition = scratch.Compose([]);
+        composition.Settings.Update(composition.Settings.Data with { Engine = EngineMode.Azure });
 
-        var hub = new HubWindow(composition);
-        hub.ShowSection(HubSection.Snippets);
+        var bar = new FlowBarWindow(composition);
+        bar.ApplyState(BarState.Idle);
 
-        CaptureWindow(hub, "hub-7-snippets");
+        CaptureContent(OnDesktop(bar.Pill, bar.Width, bar.Height, "light"), "bar-6-idle-cloud-light", 360, 140);
     }
 
-    [AvaloniaFact]
-    public void The_snippet_editor_is_captured()
+    // ---- Dialogs and text ----
+
+    [AvaloniaTheory]
+    [InlineData("light")]
+    [InlineData("dark")]
+    public void The_editors_are_captured(string theme) => InTheme(theme, () =>
     {
-        var editor = new SnippetEditorWindow(new SnippetEntry
+        CaptureWindow(new SnippetEditorWindow(new SnippetEntry
         {
             Trigger = "my address",
             Text = "12 Bridge Street\nManchester M1 2AB\nUnited Kingdom",
-        });
+        }), $"dialog-1-snippet-editor-{theme}");
 
-        CaptureWindow(editor, "hub-8-snippet-editor");
-    }
+        CaptureWindow(new DictionaryEditorWindow(
+            Murmur.Dictionary.DictionaryEntry.Correction("cloud code", "Claude Code")), $"dialog-2-entry-editor-{theme}");
 
-    [AvaloniaFact]
-    public void The_home_screen_with_a_learning_suggestion_is_captured()
-    {
-        // The honest half of "the dictionary learns by itself": a near miss of a term the user
-        // already told Murmur about, offered rather than applied.
-        using var scratch = new Scratch();
-
-        var composition = scratch.Compose(
+        CaptureWindow(new TeachCorrectionWindow("cloud code",
         [
-            new TranscriptRecord
-            {
-                At = DateTimeOffset.Now.AddMinutes(-20),
-                AudioSeconds = 6.4,
-                ProcessingSeconds = 0.44,
-                Text = "I have been using cloud code all week and it is holding up well.",
-            },
-            new TranscriptRecord
-            {
-                At = DateTimeOffset.Now.AddMinutes(-6),
-                AudioSeconds = 4.1,
-                ProcessingSeconds = 0.31,
-                Text = "Ask the cloud code team about the Windows build.",
-            },
-        ],
-        dictionary: ["Claude Code", "Anthropic", "Vercel"]);
-
-        var hub = new HubWindow(composition);
-        hub.ShowSection(HubSection.Home);
-
-        CaptureWindow(hub, "hub-9-learning-suggestion");
-    }
-
-    [AvaloniaFact]
-    public void The_teach_a_correction_dialog_is_captured()
-    {
-        var records = new List<TranscriptRecord>
-        {
             new() { At = DateTimeOffset.Now, Text = "I use cloud code every day" },
             new() { At = DateTimeOffset.Now, Text = "the cloud code team shipped it" },
-        };
-
-        var teach = new TeachCorrectionWindow("cloud code", records);
-        CaptureWindow(teach, "hub-10-teach-correction");
-    }
-
-    [AvaloniaFact]
-    public void The_microphone_picker_is_captured()
-    {
-        using var scratch = new Scratch();
-
-        var composition = scratch.Compose([], microphones: new FakeAudioDeviceCatalog(
-            new AudioDeviceInfo("{headset}", "Headset Microphone (Jabra Evolve2)", IsDefault: true),
-            new AudioDeviceInfo("{array}", "Microphone Array (Realtek Audio)", IsDefault: false),
-            new AudioDeviceInfo("{webcam}", "Webcam Microphone (Logitech Brio)", IsDefault: false)));
-
-        var hub = new HubWindow(composition);
-        hub.ShowSection(HubSection.Settings);
-
-        CaptureWindow(hub, "hub-11-microphone-picker");
-    }
-
-    [AvaloniaFact]
-    public void The_speech_clean_up_switches_are_captured()
-    {
-        // Five passes now rewrite what the user said. The switches are the reason that is safe,
-        // so they are worth looking at.
-        using var scratch = new Scratch();
-        var composition = scratch.Compose([]);
-
-        var view = new SettingsView(composition.Settings, composition.Microphones);
-        var window = new Window
-        {
-            Width = 640,
-            Height = 760,
-            Background = Tokens.Brushes.Canvas,
-            Content = view,
-        };
-
-        window.Show();
-        Dispatcher.UIThread.RunJobs();
-
-        // Scroll to the clean-up card rather than capturing the top of the page again.
-        foreach (var scroller in view.GetVisualDescendants().OfType<ScrollViewer>())
-        {
-            scroller.Offset = new Vector(0, 640);
-        }
-
-        CaptureWindow(window, "hub-12-speech-cleanup");
-    }
+        ]), $"dialog-3-teach-correction-{theme}");
+    });
 
     [AvaloniaFact]
     public void The_text_transformations_are_captured_side_by_side()
     {
-        // Five of this round's features rewrite text before it is typed. Rendering each one's
-        // before and after is the only way to review them without a Windows machine.
+        // Five features rewrite text before it is typed. Rendering each one's before and after
+        // is the only way to review them without a Windows machine.
         var samples = new (string Label, string Spoken)[]
         {
             ("Filler words", "So, um, I think we should uh ship it."),
@@ -305,14 +363,12 @@ public sealed class PreviewRenderTests
                         Children =
                         {
                             Column(Panels.Note(spoken), 0),
-                            Column(new TextBlock
+                            Column(new FluentIcon
                             {
-                                Text = "→",
-                                FontFamily = Tokens.Fonts.Ui,
-                                FontSize = Tokens.Fonts.Body,
-                                Foreground = Tokens.Brushes.InkFaint,
+                                Data = Icons.ArrowRight,
                                 Margin = new Thickness(Tokens.Space.Base, 0),
                                 VerticalAlignment = VerticalAlignment.Center,
+                                [!FluentIcon.ForegroundProperty] = Tokens.Live.InkFaint,
                             }, 1),
                             Column(Panels.Body(typed), 2),
                         },
@@ -324,12 +380,12 @@ public sealed class PreviewRenderTests
         var window = new Window
         {
             Width = 760,
-            Height = 880,
-            Background = Tokens.Brushes.Canvas,
+            Height = 900,
+            [!Window.BackgroundProperty] = Tokens.Live.Canvas,
             Content = new ScrollViewer { Content = panel },
         };
 
-        CaptureWindow(window, "text-2-transformations");
+        CaptureWindow(window, "text-1-transformations-light");
     }
 
     private static Control Column(Control control, int column)
@@ -338,133 +394,52 @@ public sealed class PreviewRenderTests
         return control;
     }
 
-    [AvaloniaFact]
-    public void The_settings_section_is_captured()
+    // ---- Plumbing ----
+
+    /// <summary>Runs <paramref name="capture"/> with the application in <paramref name="theme"/>.</summary>
+    private static void InTheme(string theme, Action capture)
     {
-        using var scratch = new Scratch();
-        var composition = scratch.Compose([]);
-
-        var hub = new HubWindow(composition);
-        hub.ShowSection(HubSection.Settings);
-
-        CaptureWindow(hub, "hub-4-settings");
-    }
-
-    [AvaloniaFact]
-    public void The_hub_is_captured_in_dark_mode()
-    {
-        // The hub follows the system appearance and the bar does not, so the dark palette is a
-        // whole second set of token values that nothing else exercises.
-        using var scratch = new Scratch();
-        var composition = scratch.Compose(Seed());
-
-        var previous = Application.Current!.RequestedThemeVariant;
+        var app = Application.Current!;
+        var previous = app.RequestedThemeVariant;
 
         try
         {
-            Application.Current.RequestedThemeVariant = ThemeVariant.Dark;
+            app.RequestedThemeVariant = theme switch
+            {
+                "dark" => ThemeVariant.Dark,
+                "hc" => ThemeResources.HighContrast,
+                _ => ThemeVariant.Light,
+            };
 
-            var hub = new HubWindow(composition);
-            hub.ShowSection(HubSection.Home);
-
-            CaptureWindow(hub, "hub-6-home-dark");
+            capture();
         }
         finally
         {
-            Application.Current.RequestedThemeVariant = previous;
+            app.RequestedThemeVariant = previous;
         }
     }
 
-    [AvaloniaFact]
-    public void The_dictionary_editor_is_captured()
-    {
-        var editor = new DictionaryEditorWindow(
-            Murmur.Dictionary.DictionaryEntry.Correction("cloud code", "Claude Code"));
-
-        CaptureWindow(editor, "hub-5-entry-editor");
-    }
-
-    [AvaloniaFact]
-    public void The_list_formatting_before_and_after_is_captured()
-    {
-        // Not chrome — this is the text fix, shown as the user sees it. Rendering it beside the
-        // raw transcript is the only way to review the feature without a Windows machine.
-        const string spoken = "one apples two bananas three oranges";
-
-        var panel = new StackPanel
-        {
-            Spacing = Tokens.Space.Roomy,
-            Margin = new Thickness(Tokens.Space.Section),
-            Children =
-            {
-                Panels.Title("Dictated lists"),
-                Panels.Note("What the recogniser produces, and what Murmur types."),
-                Panels.Card(new StackPanel
-                {
-                    Spacing = Tokens.Space.Snug,
-                    Children =
-                    {
-                        new Caption { Text = "Transcribed", IsHeader = true },
-                        Panels.Body(spoken),
-                    },
-                }),
-                Panels.Card(new StackPanel
-                {
-                    Spacing = Tokens.Space.Snug,
-                    Children =
-                    {
-                        new Caption { Text = "Typed", IsHeader = true },
-                        Panels.Body(ListFormatter.Format(spoken)),
-                    },
-                }),
-                Panels.Card(new StackPanel
-                {
-                    Spacing = Tokens.Space.Snug,
-                    Children =
-                    {
-                        new Caption { Text = "Left alone", IsHeader = true },
-                        Panels.Body(ListFormatter.Format("the first time I met her was in Paris")),
-                    },
-                }),
-            },
-        };
-
-        var window = new Window
-        {
-            Width = 620,
-            Height = 560,
-            Background = Tokens.Brushes.Canvas,
-            Content = panel,
-        };
-
-        CaptureWindow(window, "text-1-list-formatting");
-    }
-
-    // ---- Plumbing ----
-
-    /// <summary>Puts a transparent-windowed pill on a plausible desktop backdrop.</summary>
+    /// <summary>Puts the bar's capsule on a plausible desktop — a flat document-white, editor-dark or black.</summary>
     /// <remarks>
-    /// The bar's own window is transparent, so capturing it directly produces a pill floating
-    /// on a checkerboard of nothing. Compositing it over a neutral panel is what makes the
-    /// screenshot show what the user will actually see.
+    /// The bar's own window is transparent, so capturing it directly produces a capsule floating
+    /// on nothing. Compositing it over a desktop is what makes the screenshot show what the
+    /// user will actually see, shadow included.
     /// </remarks>
-    private static Border OnBackdrop(Control pill, double width, double height)
+    private static Border OnDesktop(Control pill, double width, double height, string theme)
     {
         // The pill belongs to the bar's own window; take it out before re-parenting it.
         if (pill.Parent is Panel owner) owner.Children.Remove(pill);
 
+        var desktop = theme switch
+        {
+            "dark" => Color.FromRgb(0x1E, 0x1F, 0x24),
+            "hc" => Colors.Black,
+            _ => Color.FromRgb(0xF4, 0xF4, 0xF2),
+        };
+
         return new Border
         {
-            Background = new LinearGradientBrush
-            {
-                StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative),
-                EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
-                GradientStops =
-                {
-                    new GradientStop(Color.FromRgb(0xEC, 0xEC, 0xE8), 0),
-                    new GradientStop(Color.FromRgb(0xD8, 0xD8, 0xDE), 1),
-                },
-            },
+            Background = new SolidColorBrush(desktop),
             Padding = new Thickness(Tokens.Space.Section),
             Child = new Border
             {
@@ -484,34 +459,36 @@ public sealed class PreviewRenderTests
         Save(window, name);
     }
 
-    /// <summary>
-    /// Captures a loose control inside a plain host window.
-    /// </summary>
-    /// <remarks>
-    /// The floating bar's own window is frameless and transparent, so capturing it directly
-    /// gives a pill on a field of nothing. Hosting it lets the preview show what the user
-    /// actually sees: the bar sitting on top of something else.
-    /// </remarks>
+    /// <summary>Captures a loose control inside a plain host window.</summary>
     private static void CaptureContent(Control content, string name, double width, double height)
     {
         var host = new Window
         {
             Width = width,
             Height = height,
-            SystemDecorations = SystemDecorations.None,
-            Background = Tokens.Brushes.Canvas,
+            WindowDecorations = WindowDecorations.None,
             Content = content,
         };
 
         host.Show();
         Save(host, name);
+        host.Close();
+    }
+
+    private static void Settle()
+    {
+        for (var i = 0; i < 4; i++)
+        {
+            Dispatcher.UIThread.RunJobs();
+            AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+        }
     }
 
     private static void Save(Window window, string name)
     {
-        // Let layout and any posted refresh settle before the frame is taken; a capture of a
-        // half-measured tree is worse than no capture at all.
-        for (var i = 0; i < 4; i++) Dispatcher.UIThread.RunJobs();
+        // Let layout, posted refreshes and the ≤150 ms fades settle before the frame is taken;
+        // a capture of a half-measured tree is worse than no capture at all.
+        Settle();
 
         var frame = window.CaptureRenderedFrame();
         frame.ShouldNotBeNull($"{name} rendered nothing at all");
@@ -520,7 +497,7 @@ public sealed class PreviewRenderTests
         frame.PixelSize.Height.ShouldBeGreaterThan(0, $"{name} has no height");
 
         var file = Path.Combine(OutputDirectory, name + ".png");
-        frame.Save(file);
+        frame.Save(file, PngBitmapEncoderOptions.Default);
 
         // A screen that renders blank must fail the build rather than leave a white rectangle
         // nobody looks at twice.
@@ -528,7 +505,7 @@ public sealed class PreviewRenderTests
     }
 
     /// <summary>Where the previews land: <c>artifacts/ui-preview</c> beside the solution.</summary>
-    private static string OutputDirectory
+    internal static string OutputDirectory
     {
         get
         {
@@ -547,6 +524,43 @@ public sealed class PreviewRenderTests
         }
     }
 
+    private static string[] DictionarySeed() =>
+    [
+        "Anthropic",
+        "Vercel",
+        "Claude Code",
+        "cloud code -> Claude Code",
+        "whisper flow -> Wispr Flow",
+        "# off: para keet -> Parakeet",
+    ];
+
+    private static SnippetEntry[] SnippetSeed() =>
+    [
+        new SnippetEntry
+        {
+            Trigger = "review prompt",
+            Text = "Review this change as a senior engineer.\nFlag anything risky first.",
+            Match = SnippetMatch.WholeUtterance,
+            Hotkey = HotkeyChords.Parse("Ctrl+Alt+1"),
+        },
+        new SnippetEntry
+        {
+            Trigger = "my address",
+            Text = "12 Bridge Street\nManchester M1 2AB\nUnited Kingdom",
+        },
+        new SnippetEntry
+        {
+            Trigger = "sign off",
+            Text = "Thanks for reading — shout if anything here needs another pass.\n\nPat",
+        },
+        new SnippetEntry
+        {
+            Trigger = "office hours",
+            Text = "I'm around 9 to 5 UK time, Monday to Thursday.",
+            IsEnabled = false,
+        },
+    ];
+
     private static IReadOnlyList<TranscriptRecord> Seed()
     {
         var now = DateTimeOffset.Now;
@@ -560,6 +574,7 @@ public sealed class PreviewRenderTests
                 At = now.AddDays(-4),
                 AudioSeconds = 12.4,
                 ProcessingSeconds = 0.88,
+                Engine = TranscriberKind.Parakeet,
                 Text = "The whole point of push to talk is that it never gets in the way. "
                      + "Hold the key, say the thing, let go, and it is already typed.",
             },
@@ -568,6 +583,7 @@ public sealed class PreviewRenderTests
                 At = now.AddHours(-27),
                 AudioSeconds = 3.1,
                 ProcessingSeconds = 0.22,
+                Engine = TranscriberKind.Parakeet,
                 Text = "Remind me to look at the microphone selection menu tomorrow.",
             },
             new TranscriptRecord
@@ -575,15 +591,28 @@ public sealed class PreviewRenderTests
                 At = now.AddMinutes(-38),
                 AudioSeconds = 9.8,
                 ProcessingSeconds = 0.67,
+                Engine = TranscriberKind.Azure,
+                Profile = CloudProfile.Accurate,
                 Text = "Let's ship the Windows build this week — the floating bar is the last "
                      + "piece and everything else is already on disk.",
                 Corrections = [new Murmur.Dictionary.AppliedCorrection("cloud code", "Claude Code", 1)],
             },
             new TranscriptRecord
             {
+                At = now.AddMinutes(-20),
+                AudioSeconds = 6.4,
+                ProcessingSeconds = 0.44,
+                Engine = TranscriberKind.Parakeet,
+                FellBack = true,
+                Text = "I have been using cloud code all week and it is holding up well.",
+            },
+            new TranscriptRecord
+            {
                 At = now.AddMinutes(-4),
                 AudioSeconds = 5.2,
                 ProcessingSeconds = 0.41,
+                Engine = TranscriberKind.Azure,
+                Profile = CloudProfile.Fast,
                 Text = "1. Apples\n2. Bananas\n3. Oranges",
             },
         ];
@@ -599,7 +628,8 @@ public sealed class PreviewRenderTests
             IReadOnlyList<TranscriptRecord> records,
             string[]? dictionary = null,
             SnippetEntry[]? snippets = null,
-            IAudioDeviceCatalog? microphones = null)
+            IAudioDeviceCatalog? microphones = null,
+            Func<TranscriberKind, ITranscriber?>? engines = null)
         {
             Directory.CreateDirectory(_directory);
 
@@ -620,7 +650,8 @@ public sealed class PreviewRenderTests
                 new DictionaryFile(dictionaryPath),
                 transcripts,
                 snippetStore,
-                microphones);
+                microphones,
+                engines: engines);
         }
 
         public void Dispose()

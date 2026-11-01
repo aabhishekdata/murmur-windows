@@ -54,14 +54,22 @@ public enum PushToTalkKey
 /// UI thread dies the first time the app does a slow layout pass.
 /// </para>
 /// <para>
-/// <b>Why the key is never swallowed:</b> the macOS build consumes Right Option because on
+/// <b>Why the push-to-talk key is never swallowed:</b> the macOS build consumes Right Option because on
 /// macOS that key types characters. Here, suppression buys nothing and risks something much
 /// worse — if the key-down is swallowed but the key-up escapes (the hook timed out
 /// mid-gesture, or focus crossed into an elevated window), the target application believes
 /// the modifier is held down forever.
 /// </para>
+/// <para>
+/// <b>Esc is the one exception</b> (<see cref="ICancelKeySource"/>). While the engine has armed it —
+/// recording or transcribing, and only then — an Esc press is consumed so that cancelling a
+/// dictation does not also close whatever the user was dictating into. The key-down decides for
+/// the pair: a press that went down swallowed has its key-up swallowed too, whatever the flag says
+/// by then, and one that went down unarmed is passed through whole. Esc is not a modifier, so a
+/// lost key-up would at worst leave nothing stuck.
+/// </para>
 /// </remarks>
-public sealed class PushToTalkHook : IHotkeySource
+public sealed class PushToTalkHook : IHotkeySource, ICancelKeySource
 {
     private const int WH_KEYBOARD_LL = 13;
     private const int HC_ACTION = 0;
@@ -83,6 +91,7 @@ public sealed class PushToTalkHook : IHotkeySource
     private const int VK_RCONTROL = 0xA3;
     private const int VK_LMENU = 0xA4;
     private const int VK_RMENU = 0xA5;
+    private const int VK_ESCAPE = 0x1B;
 
     private const int ScanCodeRightShift = 0x36;
 
@@ -155,15 +164,49 @@ public sealed class PushToTalkHook : IHotkeySource
     private Thread? _thread;
     private uint _threadId;
     private volatile bool _isDown;
+    private volatile bool _cancelArmed;
+    private volatile bool _swallowingEscape;
+    private volatile int _key = (int)PushToTalkKey.RightControl;
 
     /// <summary>Which key triggers dictation.</summary>
-    public PushToTalkKey Key { get; set; } = PushToTalkKey.RightControl;
+    public PushToTalkKey Key
+    {
+        get => (PushToTalkKey)_key;
+        set => VirtualKey = (int)value;
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Read by the hook thread on every event and written from the UI thread, hence the
+    /// volatile field. Changing it forgets any half-finished press: a key-up for the new key
+    /// that was never seen going down must not count as a release.
+    /// </remarks>
+    public int VirtualKey
+    {
+        get => _key;
+        set
+        {
+            if (_key == value) return;
+            _key = value;
+            _isDown = false;
+        }
+    }
 
     /// <inheritdoc />
     public event EventHandler? Pressed;
 
     /// <inheritdoc />
     public event EventHandler? Released;
+
+    /// <inheritdoc />
+    public event EventHandler? CancelPressed;
+
+    /// <inheritdoc />
+    public bool CancelArmed
+    {
+        get => _cancelArmed;
+        set => _cancelArmed = value;
+    }
 
     /// <inheritdoc />
     public bool Start()
@@ -227,6 +270,7 @@ public sealed class PushToTalkHook : IHotkeySource
         _thread = null;
         _threadId = 0;
         _isDown = false;
+        _swallowingEscape = false;
 
         if (ReferenceEquals(s_instance, this))
         {
@@ -243,7 +287,9 @@ public sealed class PushToTalkHook : IHotkeySource
 
         try
         {
-            self.Handle(wParam, lParam);
+            // Esc while a dictation is in progress, and nothing else: returning non-zero without
+            // chaining is how a low-level hook consumes a key.
+            if (self.Handle(wParam, lParam)) return new IntPtr(1);
         }
         catch (Exception)
         {
@@ -257,12 +303,13 @@ public sealed class PushToTalkHook : IHotkeySource
         return CallNextHookEx(IntPtr.Zero, code, wParam, lParam);
     }
 
-    private void Handle(IntPtr wParam, IntPtr lParam)
+    /// <returns>True to consume the event.</returns>
+    private bool Handle(IntPtr wParam, IntPtr lParam)
     {
         var e = Marshal.PtrToStructure<KBDLLHOOKSTRUCT>(lParam);
 
         // Ignore anything this app injected itself.
-        if (e.ExtraInfo == InjectedTag) return;
+        if (e.ExtraInfo == InjectedTag) return false;
 
         // ToInt32 rather than a cast: since .NET 7 an explicit (int)IntPtr conversion
         // silently truncates instead of throwing, which CA2020 flags. Window messages are
@@ -270,23 +317,46 @@ public sealed class PushToTalkHook : IHotkeySource
         var message = wParam.ToInt32();
         var isDown = message is WM_KEYDOWN or WM_SYSKEYDOWN;
         var isUp = message is WM_KEYUP or WM_SYSKEYUP;
-        if (!isDown && !isUp) return;
+        if (!isDown && !isUp) return false;
 
-        if (Normalize(e) != (int)Key) return;
+        if (e.VirtualKey == VK_ESCAPE) return HandleEscape(isDown);
+
+        if (Normalize(e) != _key) return false;
 
         if (isDown)
         {
             // The OS re-fires key-down while a key is held; only the first is a press.
-            if (_isDown) return;
+            if (_isDown) return false;
             _isDown = true;
             Pressed?.Invoke(this, EventArgs.Empty);
         }
         else
         {
-            if (!_isDown) return;
+            if (!_isDown) return false;
             _isDown = false;
             Released?.Invoke(this, EventArgs.Empty);
         }
+
+        return false;
+    }
+
+    /// <summary>Consumes an Esc press, down and up together, if it began while armed.</summary>
+    private bool HandleEscape(bool isDown)
+    {
+        if (!isDown)
+        {
+            var swallowed = _swallowingEscape;
+            _swallowingEscape = false;
+            return swallowed;
+        }
+
+        // Auto-repeat of a press already being consumed.
+        if (_swallowingEscape) return true;
+        if (!_cancelArmed) return false;
+
+        _swallowingEscape = true;
+        CancelPressed?.Invoke(this, EventArgs.Empty);
+        return true;
     }
 
     /// <summary>

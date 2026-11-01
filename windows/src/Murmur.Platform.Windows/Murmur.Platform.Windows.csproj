@@ -5,6 +5,10 @@
     <TargetFramework>net10.0-windows</TargetFramework>
     <RootNamespace>Murmur.Platform.Windows</RootNamespace>
     <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+    <!-- A class library normally leaves its package dependencies in the NuGet cache. The app
+         loads this assembly by path, so NAudio has to sit beside it in bin for the app's
+         build and publish targets to pick up. -->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
 
   <ItemGroup>

@@ -89,28 +89,29 @@ internal static class PlatformFactory
         Create<IAudioDeviceCatalog>("WasapiDeviceCatalog", []);
 
     /// <summary>Creates the low-level keyboard hook, or null off Windows.</summary>
-    [UnconditionalSuppressMessage(
-        "Trimming",
-        "IL2075:DynamicallyAccessedMembers",
-        Justification = "Murmur.Platform.Windows is published whole and never trimmed.")]
     public static IHotkeySource? CreateHotkeySource(int virtualKey)
     {
         var hook = Create<IHotkeySource>("PushToTalkHook", []);
-        if (hook is null) return null;
 
-        // Key is an enum on the concrete type; set it by name to avoid referencing it.
-        var property = hook.GetType().GetProperty("Key");
-        if (property is not null && property.PropertyType.IsEnum)
-        {
-            property.SetValue(hook, Enum.ToObject(property.PropertyType, virtualKey));
-        }
+        // Through the interface rather than the concrete enum property by reflection, so the
+        // same setter is what Settings uses to change the key while the app runs.
+        if (hook is not null) hook.VirtualKey = virtualKey;
 
         return hook;
     }
 
-    /// <summary>Creates the SendInput injector, or null off Windows.</summary>
-    public static ITextInjector? CreateTextInjector() =>
-        Create<ITextInjector>("SendInputTextInjector", []);
+    /// <summary>Creates the SendInput keystroke bindings, or null off Windows.</summary>
+    /// <remarks>Deciding what to type or paste is <see cref="Murmur.Core.SmartTextInjector"/>'s job.</remarks>
+    public static IKeystrokeSender? CreateKeystrokeSender() =>
+        Create<IKeystrokeSender>("SendInputKeystrokeSender", []);
+
+    /// <summary>Creates the <c>RegisterHotKey</c> bindings for prompt shortcuts, or null off Windows.</summary>
+    public static IGlobalHotkeys? CreateGlobalHotkeys() =>
+        Create<IGlobalHotkeys>("RegisterHotKeyGlobalHotkeys", []);
+
+    /// <summary>Creates the DPAPI protector the Azure key is encrypted with, or null off Windows.</summary>
+    public static IDataProtector? CreateDataProtector() =>
+        Create<IDataProtector>("DpapiDataProtector", []);
 
     [UnconditionalSuppressMessage(
         "Trimming",
